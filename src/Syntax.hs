@@ -11,7 +11,7 @@ data Kat =
   | KSeq Kat Kat
   | KUnion Kat Kat
   | KStar Kat
-  deriving Eq
+  deriving (Eq)
 
 
 instance Show Kat where
@@ -23,6 +23,28 @@ instance Show Kat where
   show (KStar p) = "(" ++ show p ++ ")*"
   show (KVar s) = s
 
+data Test =
+  TTrue
+  | TFalse
+  | TAnd Test Test
+  | TOr Test Test
+  | TVar AtomicTest
+  | TNeg Test
+  deriving (Eq,Ord)
+
+instance Show Test where
+  show TTrue = "1"
+  show TFalse = "0"
+  show (TAnd p q) = show p ++ ";" ++ show q
+  show (TOr p q) = show p ++ " || " ++ show q
+  show (TVar v) = v
+  show (TNeg x) = "~" ++ show x
+
+
+ifElse :: Test -> Kat -> Kat -> Kat
+ifElse cond tru fls =
+  (KTest cond `KSeq` tru)
+  `KUnion` (KTest (TNeg cond) `KSeq` fls)
 
 data Query = -- a relational alegebra for Queries
   QEmpty -- Uninhabited
@@ -52,20 +74,3 @@ instance Show Query  where
   show (QComplement q) = "~" ++ show q
   -- show (QSubtract q q') = show q ++ " \\ " show q'
   show (QStar q) = "(" ++ show q ++ ")*"
-
-data Test =
-  TTrue
-  | TFalse
-  | TAnd Test Test
-  | TOr Test Test
-  | TVar AtomicTest
-  | TNeg Test
-  deriving (Eq,Ord)
-
-instance Show Test where
-  show TTrue = "1"
-  show TFalse = "0"
-  show (TAnd p q) = show p ++ ";" ++ show q
-  show (TOr p q) = show p ++ " + " ++ show q
-  show (TVar v) = v
-  show (TNeg x) = "~" ++ show x

@@ -19,8 +19,8 @@ data Atom =
 
 instance Show Atom where
   show Empty = ""
-  show (Pos v a) = v ++ ";"++ show a
-  show (Neg v a) = "~" ++ v ++ ";" ++ show a
+  show (Pos v a) = v ++ "."++ show a
+  show (Neg v a) = "~" ++ v ++ "." ++ show a
   
 -- A guarded String is either a single atom `alpha`, or it is
 -- Cons-cell `alpha rho gs`, where `alpha` is an atom, `rho` is a
@@ -117,7 +117,7 @@ gs_interp :: Set AtomicTest -> Kat -> Set GuardedString
 gs_interp alphabet End = Set.empty
 gs_interp alphabet Nop =
   let atoms = all_atoms alphabet in
-    Set.fromList [Prog a "" (Single b) | a <- atoms, b <- atoms]
+    Set.fromList [Prog a "" (Single a) | a <- atoms]
 
 gs_interp alphabet (KTest t) =
   Set.fromList [(Single a) | a <- induced_atoms alphabet t]
@@ -130,3 +130,21 @@ gs_interp alphabet (KSeq p q) = gs_interp alphabet p `setFuse` gs_interp alphabe
 gs_interp alphabet (KUnion p q) = gs_interp alphabet p `Set.union` gs_interp alphabet q
 gs_interp alphabet (KStar p) = lub (gs_interp alphabet p) Set.empty
 
+
+gs_assertion_interp :: Set AtomicTest -> Test -> Kat -> Set GuardedString
+gs_assertion_interp _ _ End = Set.empty
+gs_assertion_interp alphabet assertion Nop =
+  Set.fromList [Prog a "NOP" (Single a) | a <- induced_atoms alphabet assertion ]
+
+gs_assertion_interp alphabet assertion (KTest t) =
+  Set.fromList [(Single a) | a <- induced_atoms alphabet (assertion `TAnd` t) ]
+
+gs_assertion_interp alphabet assertion (KVar v) =
+  let atoms = induced_atoms alphabet assertion in
+  Set.fromList [ Prog a v (Single b) | a <- atoms, b <- atoms ]
+
+gs_assertion_interp alphabet assertion (KSeq p q) = gs_assertion_interp alphabet assertion p
+                                                     `setFuse` gs_assertion_interp alphabet assertion q
+gs_assertion_interp alphabet assertion (KUnion p q) = gs_assertion_interp alphabet assertion p
+                                                       `Set.union` gs_assertion_interp alphabet assertion q
+gs_assertion_interp alphabet assertion (KStar p) = lub (gs_assertion_interp alphabet assertion p) Set.empty

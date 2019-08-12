@@ -44,7 +44,7 @@ compileBDD (TNeg a) = negBDD $ compileBDD a
 -- restricts a BDD to be true iff `v` is true
 restrictBDD :: BDD -> AtomicTest -> BDD
 restrictBDD BTrue v = Branch v BTrue BFalse
-restrictBDD BFalse v = Branch v BFalse BTrue
+restrictBDD BFalse v = BFalse
 restrictBDD x@(Branch v' tru fls) v =
   if v == v' then
     x
@@ -53,10 +53,10 @@ restrictBDD x@(Branch v' tru fls) v =
   else
     Branch v' (restrictBDD tru v) (restrictBDD fls v)  
 
--- restricts a BDD to be true if and only if `v` is false
+-- restricts a BDD to be true if `v` is false
 negRestrictBDD :: BDD -> AtomicTest -> BDD
 negRestrictBDD BTrue v = Branch v BFalse BTrue
-negRestrictBDD BFalse v = Branch v BTrue BTrue
+negRestrictBDD BFalse v = BFalse
 negRestrictBDD x@(Branch v' tru fls) v =
   if v == v' then
     x
@@ -91,5 +91,9 @@ andBDDs BTrue y = y
 andBDDs x BTrue = x
 andBDDs BFalse _ = BFalse
 andBDDs _ BFalse = BFalse
-andBDDs (Branch v tru fls) y =
-  restrictBDD (tru `andBDDs` y) v `orBDDs` negRestrictBDD (fls `andBDDs` y) v
+andBDDs b@(Branch v tru fls) b'@(Branch v' tru' fls') =
+  if v' > v
+  then andBDDs b' b
+  else if v == v'
+  then Branch v (tru `andBDDs` tru') (fls `andBDDs` fls')
+  else Branch v (tru `andBDDs` b') (fls `andBDDs` b')

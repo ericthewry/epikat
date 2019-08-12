@@ -1,5 +1,8 @@
 module Epik where
 
+import Prelude hiding (last)
+
+import Data.List hiding (last)
 
 import Data.Set (Set)
 import qualified Data.Set as Set
@@ -22,6 +25,7 @@ type Param = String
 
 data Declarations =
   Program { alphabet :: Set AtomicTest        -- the alphabet of world-states
+          , assertions :: [Test] -- conditions that specify consistent worlds
           , actions :: [(AtomicProgram, Kat)] -- the world actions and their relations
           , views :: [(Agent, Map AtomicProgram [AtomicProgram])] -- alternative relations
           , queries :: [(QueryName, Query)] -- queries expressed in KAT
@@ -31,6 +35,12 @@ data Context =
   Context { alphabetc :: Set AtomicTest
           , actionsc :: [Action]
           , viewsc :: [(Agent, Auto -> Auto)]}
+
+
+instance Show Context where
+  show ctx = "Context { alphabetc = " ++ show (alphabetc ctx)
+             ++ ", actionsc = " ++ show (actionsc ctx)
+             ++ ", viewsc = [" ++ intercalate ", " (map (\(agent, _) -> agent ++ " : <func>") (viewsc ctx)) ++ "]"
   
 data Action = Action { name :: String
                      , relation :: Set (Atom, Atom)
@@ -40,6 +50,10 @@ data QueryResult =
   QAuto Auto
   | QRel (Auto -> Auto)
 
+instance Show QueryResult where
+  show (QAuto auto) = show auto
+  show (QRel _) = "<FUN>"
+
 
 gs_relation :: (Ord a, Ord b) =>
                (GuardedString -> a) ->
@@ -47,10 +61,11 @@ gs_relation :: (Ord a, Ord b) =>
                Set GuardedString    -> Set (a,b)
 gs_relation f g = Set.map (\s -> (f s, g s)) 
 
-compile_action :: String -> Set AtomicTest -> Kat -> Action
-compile_action name alphabet prog =
+compile_action :: String -> Set AtomicTest -> [Test] -> Kat -> Action
+compile_action name alphabet assertions kat_term =
   Action { name = name
-         , relation = gs_relation first last $ gs_interp alphabet prog
+         , relation = gs_relation first last $
+                      gs_assertion_interp alphabet (foldr TAnd TTrue assertions) kat_term
          }
 
 
@@ -98,7 +113,7 @@ katFromAction :: Action -> Kat
 katFromAction act = Set.foldr (\(pre, post) kat ->
                                  katFromAtom pre `KSeq`
                                  KVar (name act) `KSeq`
-                                 katFromAtom post
+                                 katFromAtom post `KUnion` kat
                               ) End (relation act)
 
 compileQuery :: Context -> Query -> QueryResult
@@ -137,8 +152,8 @@ compileQuery ctx (QUnion q q') =
 
 compileQuery ctx (QComplement q) =
   case compileQuery ctx q of
-    QAuto a -> QAuto $ complementAuto a
-    QRel f -> QRel $ (\x -> complementAuto (f x))
+    QAuto a -> QAuto $ complementAuto (alphabetc ctx) a
+    QRel f -> QRel $ (\x -> complementAuto (alphabetc ctx) (f x))
 
 -- compileQuery ctx (QSubtract q q') = compileQuery ctx $
 --                                     q `QIntersect` QComplement q'
@@ -151,8 +166,10 @@ compileQuery ctx (QStar q) =
  
 compileDecls :: Declarations -> Context
 compileDecls decls =
-  Context { alphabetc = alphabet decls
-          , actionsc = map (\(n, p) -> compile_action n (alphabet decls) p) (actions decls)
+  let alpha = alphabet decls in
+  let asserts = assertions decls in
+  Context { alphabetc = alpha
+          , actionsc = map (\(n, p) -> compile_action n alpha asserts p) (actions decls)
           , viewsc = map (\(a, m) -> (a, compile_views (alphabet decls) m)) (views decls)
           }
 
@@ -174,5 +191,5 @@ showQueryResults decls =
                 QAuto a ->
                   let guardedStrings = foldr (accShow "\n\t") "\n" $
                                        toLoopFreeStrings (alphabet decls) a  in
-                  name ++ " identifies the following (loop-free) strings:" ++ guardedStrings ++  "\n\n" ++ accStr
+                  name ++ " identifies the following (loop-free) strings:" ++ guardedStrings ++  "-----\n\n" ++ accStr
           ) "" queries

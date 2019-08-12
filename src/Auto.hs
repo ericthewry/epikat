@@ -1,5 +1,7 @@
 module Auto where
 
+import Data.List
+
 import Data.Set (Set)
 import qualified Data.Set as Set
 
@@ -16,13 +18,28 @@ import GuardedStrings
 -- AtomicProgram is at the tape head
 data Cond = CTest Test
           | CProg AtomicProgram
-          deriving (Eq, Show, Ord)
+          deriving (Eq, Ord)
+
+instance Show Cond where
+  show (CTest t) = "[" ++ show t ++ "]"
+  show (CProg a) = a
 
 -- invariant :: start is minimum integer and final is maxium integer
 data Auto =  Auto { start :: Integer
                   , delta :: Map Integer [(Cond, Integer)]
                   , final :: Set Integer
-                  } deriving (Eq, Show)
+                  } deriving (Eq)
+
+instance Show Auto where
+  show auto =
+    let stringOf k = if k == (start auto) then ">" else "" ++
+                     if Set.member k (final auto) then "(" ++ show k ++ ")" else show k in
+    let edge src (cond, tgt) rst =
+          stringOf src ++ " --" ++ show cond ++ "--> " ++ stringOf tgt ++ "\n" ++ rst in
+    Map.foldrWithKey (\src edges str ->
+                         foldr (edge src) "" edges
+                         ++ str
+                     ) "" (delta auto)
 
 -- a well-formed path alternates between Integers and Conds, starting
 -- and ending with an Integers
@@ -36,8 +53,22 @@ increment i auto = Auto { start = start auto + i
                                      let a' = map (\(c, x) -> (c, x + i)) a in
                                        Map.insert (k + i) a' rst
                                   ) Map.empty (delta auto)
-                        , final = Set.singleton (start auto + i) }
-                        
+                        , final = Set.map (+i) (final auto) }
+
+-- [rename src dst a] replaces every occurence of [src] with [dst] in the automaton
+rename :: Integer -> Integer -> Auto -> Auto
+rename src dst auto =
+  let replace x = if x == src then dst else x in
+  Auto { start = replace (start auto)
+       , delta = Map.foldrWithKey
+                 (\node outArcs rst ->
+                     let outArcs' = map (\(c, i) -> (c, replace i)) outArcs in
+                     let k' = replace node in
+                       Map.insert k' outArcs' rst
+                 ) Map.empty (delta auto)
+       , final = Set.map replace (final auto)
+       }
+  
 
 -- The always-accepting transition
 epsilon :: Cond
@@ -67,6 +98,27 @@ concatAuto pauto quato =
          , delta = delta pauto `ext_union` delta qauto' `ext_union` connection
          , final = final qauto'}
 
+-- computes the union of two automata
+unionAuto :: Auto -> Auto -> Auto
+unionAuto p q =
+  let p' = increment 1 $ p in
+  let pmax = Set.findMax $ final p' in
+  let q' = increment (pmax + 1) $ q in
+  let qmax = Set.findMax $ final q' in
+  let entermap = Map.singleton 0 [(epsilon, start p'), (epsilon, start q')] in
+  let unionFinal = 1 + (if pmax > qmax then pmax else qmax) in
+  let exitmap = Set.foldr (extend (epsilon, unionFinal))
+                Map.empty
+                (final p' `Set.union` final q') in
+
+  Auto { start = 0
+       , delta = delta p'
+                 `ext_union` delta q'
+                 `ext_union` entermap
+                 `ext_union` exitmap
+       , final = Set.singleton (unionFinal)}
+
+
 -- takes the "star" of an automaton
 iterateAuto pauto = 
   let final_start = -- epsilon transitions from final pauto to start pauto
@@ -84,44 +136,58 @@ iterateAuto pauto =
        , final = final pauto}
 
 
--- computes the union of two automata
-unionAuto :: Auto -> Auto -> Auto
-unionAuto pauto qauto =
-  let pauto = increment 1 $ pauto in
-  let pmax = Set.findMax $ final pauto in
-  let qauto = increment (pmax + 1) $ qauto in
-  let qmax = Set.findMax $ final qauto in
-  let entermap = Map.singleton 0 [(epsilon, start pauto), (epsilon, start qauto)] in
+completeOne :: Set AtomicTest -> Integer -> [(Cond, Integer)] -> [(Cond, Integer)]
+completeOne alphabet dummy edges =
+  let (usedAlphabet, allTests) =
+        foldr (\ (c, _) (seenAlpha, seenTest) ->
+                  case c of
+                    CTest t -> (seenAlpha, t `TAnd` seenTest)
+                    CProg a -> ((CProg a, dummy) : seenAlpha, seenTest)
+              ) ([], TTrue) edges in
+  (CTest (TNeg allTests), dummy) : nub usedAlphabet ++ edges
+    
 
-  let exitmap = Set.foldr (extend (epsilon, qmax + 1))
-                Map.empty
-                (final pauto `Set.union` final qauto) in
+completeDelta :: Set AtomicTest -> Integer -> Integer -> [(Cond, Integer)] -> Map Integer [(Cond, Integer)] -> Map Integer [(Cond, Integer) ]
+completeDelta alphabet dummy nodeId edges deltaRec =
+  let sndEq (_, dstNodeId) (_, dstNodeId') = dstNodeId == dstNodeId' in
+  let coterminalEdges = groupBy sndEq edges in
+  let extended = map (completeOne alphabet dummy) coterminalEdges in
+  Map.insert nodeId (concat extended) deltaRec
 
-  Auto { start = 0
-       , delta = delta pauto
-                 `ext_union` delta qauto
-                 `ext_union` entermap
-                 `ext_union` exitmap
-       , final = Set.singleton (qmax + 1)}
+-- converts an automaton into a total automaton, i.e. every letter in
+-- the alphabet
+completeAuto :: Set AtomicTest -> Auto -> Auto
+completeAuto alphabet a =
+  let dummyState = 1 in
+  let a' = rename 1 (start a) (increment 1 a) in
+  Auto { start = start a
+       , delta = Map.foldrWithKey (completeDelta alphabet dummyState) Map.empty (delta a')
+       , final = final a' }
+  
+        
 
 -- computes the complement of an auto
-complementAuto :: Auto -> Auto
-complementAuto a =
-  let states = Set.fromList (
-        Map.keys (delta a) ++
-        foldr (\ts els ->  (map snd ts) ++ els) [] (Map.elems (delta a))) in
+complementAuto :: Set AtomicTest ->  Auto -> Auto
+complementAuto alphabet a =
+  let a' = completeAuto alphabet a in
+  let states = Set.fromList $
+               Map.keys (delta a') ++
+               foldr (\ts els ->  (map snd ts) ++ els) [] (Map.elems $ delta a') in
 
   let final' = states `Set.difference` final a in
+  let final'' = if Set.size final' == 0
+                then Set.singleton (Set.findMax (final a') + 1)
+                else final' in
     Auto { start = start a
          , delta = delta a
-         , final = final' }
+         , final = final'' }
 
 
 -- builds an automaton from an input `Kat` expression
 construct :: Kat -> Auto
 construct End = Auto { start = 0
                      , delta= Map.empty
-                     , final = Set.empty}
+                     , final = Set.singleton 1}
                 
 construct Nop = Auto {start = 0,
                        delta = Map.singleton 0 [(epsilon, 1)],
@@ -130,6 +196,10 @@ construct Nop = Auto {start = 0,
 construct (KTest t) = Auto { start = 0
                            , delta = Map.singleton 0 [(CTest t, 1)]
                            , final = Set.singleton 1}
+
+construct (KVar s) = Auto { start = 0
+                          , delta = Map.singleton 0 [(CProg s, 1)]
+                          , final = Set.singleton 1}
                       
 construct (KSeq p q) = construct p `concatAuto` construct q
     
@@ -137,9 +207,6 @@ construct (KUnion p q) = construct p `unionAuto` construct q
     
 construct (KStar p) = iterateAuto $ construct p
   
-construct (KVar s) = Auto { start = 0
-                          , delta = Map.singleton 0 [(CProg s, 1)]
-                          , final = Set.singleton 1}
 
 -- `autoDfs a (start a) []` computes all loop-free paths through a network. 
 autoDFS :: Auto -> Integer -> Path -> [Path]
@@ -151,7 +218,7 @@ autoDFS a state p =
     case state `Map.lookup` delta a of
       Nothing -> []
       Just worklist ->
-        let unseenWkList = filter (\(_,nexthop) -> Left nexthop `Set.member` Set.fromList p) worklist in
+        let unseenWkList = filter (\(_,nexthop) -> not (Left nexthop `Set.member` Set.fromList p)) worklist in
           foldr (\(cond, nexthop) rst -> autoDFS a nexthop (p ++ [Right cond, Left nexthop]) ++ rst) [] unseenWkList
 
 -- `normalize nothing p` Inserts unitary tests between consecutive

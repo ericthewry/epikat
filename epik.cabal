@@ -4,16 +4,16 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: bf215e4f6d77fb6af4c357b1a3af5e71469ee5e59c755183eb5540c2b5432f78
+-- hash: 457b75a38dbd649aeca07c0ae1033587ce6f1d8b14f95c4ad4eb7316d4f3cce7
 
 name:           epik
 version:        0.1.0.0
 description:    Please see the README on GitHub at <https://github.com/githubuser/epik#readme>
-homepage:       https://github.com/githubuser/epik#readme
-bug-reports:    https://github.com/githubuser/epik/issues
-author:         Author name here
-maintainer:     example@example.com
-copyright:      2019 Author name here
+homepage:       https://github.com/ericthewry/epik#readme
+bug-reports:    https://github.com/ericthewry/epik/issues
+author:         Eric Campbell
+maintainer:     ehc86@cornell.edu
+copyright:      2019 Eric Campbell
 license:        BSD3
 license-file:   LICENSE
 build-type:     Simple
@@ -23,7 +23,7 @@ extra-source-files:
 
 source-repository head
   type: git
-  location: https://github.com/githubuser/epik
+  location: https://github.com/ericthewry/epik
 
 library
   exposed-modules:
