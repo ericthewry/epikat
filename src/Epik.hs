@@ -178,6 +178,8 @@ runQueries decls =
   let context = compileDecls decls in
     map (\(name, query) -> (name, compileQuery context query)) (queries decls)
 
+qplus :: Query -> Query
+qplus query = query `QConcat` QStar query
 
 accShow :: Show a => String -> a -> String -> String
 accShow sep x str = sep ++ show x ++ str

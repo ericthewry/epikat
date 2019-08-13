@@ -45,7 +45,7 @@ test_prog name ht = (name ht, test_prop ht)
 
 
 -- Alternative Relation
-alice_alternative = ("Alice" ,
+alice_alternative = ("alice" ,
                      Map.fromList [(public_announce heads, [public_announce heads]),
                                    (public_announce tails, [public_announce tails]),
                                    (alice `peeksAt` heads, [alice `peeksAt` heads]),
@@ -58,7 +58,7 @@ alice_alternative = ("Alice" ,
                                    (bob `sneaksALookAt` tails, [noop])
                                   ])
 
-bob_alternative = ("Bob",
+bob_alternative = ("bob",
                    Map.fromList [(public_announce heads, [public_announce heads]),
                                  (public_announce tails, [public_announce tails]),
                                  (alice `peeksAt` heads, [alice `peeksAt` tails, alice `peeksAt` heads]),
@@ -69,9 +69,12 @@ bob_alternative = ("Bob",
                                  (alice `sneaksALookAt` tails, [noop]),
                                  (bob `sneaksALookAt` heads, [bob `sneaksALookAt` heads]),
                                  (bob `sneaksALookAt` tails, [bob `sneaksALookAt` tails])
-                                 ])                    
+                                 ])
 
-
+bob_sees_heads =
+  qplus(QIdent (public_announce heads)
+        `QUnion` QIdent (bob `peeksAt` heads)
+        `QUnion` QIdent (bob `sneaksALookAt` heads))
 
 
 -- A Hypothesis for the knowledge query.
@@ -103,7 +106,10 @@ prog = Program
    test_prog (sneaksALookAt bob) tails
   ]
   [bob_alternative, alice_alternative]
-  [("EverAnnounces?", ever public_announce_query)]
+  [("EverAnnounces?", ever public_announce_query),
+   ("bob saw heads", bob_sees_heads),
+   ("What does Alice know about Bob (who saw heads)?", alice `knows` (bob_sees_heads))
+  ]
   
 hd [] = undefined
 hd (x:_) = x
