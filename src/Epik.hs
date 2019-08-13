@@ -98,7 +98,7 @@ compileView view (QIdent s) =
     Nothing -> QIdent s
     Just [] -> QIdent s
     Just alts ->
-      foldr (QUnion (QIdent x)) QEmpty alts
+      foldr (QUnion . QIdent ) QEmpty alts
     
 compileView view (QApply q q') =
   binary QApply (compileView view) q q'
