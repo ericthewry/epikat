@@ -4,15 +4,14 @@ type AtomicProgram = String
 type AtomicTest = String
 
 data Kat =
-  End
-  | Nop
-  | KTest Test
-  | KVar AtomicProgram
-  | KSeq Kat Kat
-  | KUnion Kat Kat
-  | KStar Kat
+  End -- End :: Kat
+  | Nop -- Nop :: Kat
+  | KTest Test -- KTest :: Test -> Kat
+  | KVar AtomicProgram -- KVar :: AtomicProgram -> Kat
+  | KSeq Kat Kat       -- KSeq :: Kat -> Kat -> Kat  
+  | KUnion Kat Kat     -- KUnion :: Kat -> Kat -> Kat
+  | KStar Kat          -- KStar :: Kat -> Kat
   deriving (Eq)
-
 
 instance Show Kat where
   show End = "0"
@@ -42,7 +41,7 @@ instance Show Test where
 
 
 ifElse :: Test -> Kat -> Kat -> Kat
-ifElse cond tru fls =
+ifElse cond tru fls = -- if (cond) { tru } else { fls } =^= cond ; tru + ~cond;fls
   (KTest cond `KSeq` tru)
   `KUnion` (KTest (TNeg cond) `KSeq` fls)
 

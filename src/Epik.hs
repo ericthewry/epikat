@@ -190,6 +190,7 @@ showQueryResults decls =
                 QRel _ -> name ++ " is a function, so we cannot print it"
                 QAuto a ->
                   let guardedStrings = foldr (accShow "\n\t") "\n" $
+                                       nub $
                                        toLoopFreeStrings (alphabet decls) a  in
                   name ++ " identifies the following (loop-free) strings:" ++ guardedStrings ++  "-----\n\n" ++ accStr
           ) "" queries

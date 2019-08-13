@@ -46,7 +46,8 @@ last :: GuardedString -> Atom
 last (Single a) = a
 last (Prog _ _ gs) = last gs
 
--- `fuse` combines two guarded strings `gs` and `gs'` if `last gs == first gs'`.
+-- `fuse` combines two guarded strings `gs` and `gs'`
+--  if `last gs == first gs'`.
 -- Otherwise it evaluates to `None`. written in math via `<>`
 fuse :: GuardedString -> GuardedString -> Maybe GuardedString
 fuse (Single a) (Single b) | a == b = Just $ Single a
@@ -79,12 +80,14 @@ setFuse xs ys =
 
 -- Compute the fixpoint of the set-lifted fuse operation
 lub :: Set GuardedString -> Set GuardedString -> Set GuardedString
-lub gp prev =
-  let next = setFuse gp prev `Set.union` prev in
+lub gsSet prev =
+  let next = (gsSet `setFuse` prev) `Set.union` prev in
   if next == prev
   then next
-  else lub gp next
+  else lub gsSet next
 
+fixpointGS :: Set GuardedString -> Set GuardedString
+fixpointGS gs = lub gs Set.empty
 
 -- For a given set of atomic tests, i.e. an alphabet, compute all atoms that
 -- could arise out of combining the elements of the alphabet
@@ -115,6 +118,7 @@ induced_atoms :: Set AtomicTest -> Test -> [Atom]
 induced_atoms alphabet t = filter (\ a -> evalAtom a t) $ all_atoms alphabet 
 
 -- Interprets a `Kat` expression in a given alphabet, producing its corresponding set of guarded strings
+-- [| p |]^X subset of GuardedString
 gs_interp :: Set AtomicTest -> Kat -> Set GuardedString
 gs_interp alphabet End = Set.empty
 gs_interp alphabet Nop =
@@ -130,13 +134,16 @@ gs_interp alphabet (KVar v) =
 
 gs_interp alphabet (KSeq p q) = gs_interp alphabet p `setFuse` gs_interp alphabet q
 gs_interp alphabet (KUnion p q) = gs_interp alphabet p `Set.union` gs_interp alphabet q
-gs_interp alphabet (KStar p) = lub (gs_interp alphabet p) Set.empty
+gs_interp alphabet (KStar p) = fixpointGS (gs_interp alphabet p)
+
+
+
 
 
 gs_assertion_interp :: Set AtomicTest -> Test -> Kat -> Set GuardedString
 gs_assertion_interp _ _ End = Set.empty
 gs_assertion_interp alphabet assertion Nop =
-  Set.fromList [Prog a "NOP" (Single a) | a <- induced_atoms alphabet assertion ]
+  Set.fromList [Prog a "1" (Single a) | a <- induced_atoms alphabet assertion ]
 
 gs_assertion_interp alphabet assertion (KTest t) =
   Set.fromList [(Single a) | a <- induced_atoms alphabet (assertion `TAnd` t) ]
