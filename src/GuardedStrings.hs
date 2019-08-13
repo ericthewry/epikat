@@ -19,8 +19,10 @@ data Atom =
 
 instance Show Atom where
   show Empty = ""
-  show (Pos v a) = v ++ "."++ show a
-  show (Neg v a) = "~" ++ v ++ "." ++ show a
+  show (Pos v Empty) = v
+  show (Neg v Empty) = "~" ++ v
+  show (Pos v a) = " " ++ v ++ " " ++ show a
+  show (Neg v a) = "~" ++ v ++ " " ++ show a
   
 -- A guarded String is either a single atom `alpha`, or it is
 -- Cons-cell `alpha rho gs`, where `alpha` is an atom, `rho` is a
@@ -31,8 +33,8 @@ data GuardedString =
   deriving (Eq,Ord)
 
 instance Show GuardedString where
-  show (Single atom) = show atom
-  show (Prog atom prog gs) = show atom ++ "" ++ show prog ++ "" ++ show gs
+  show (Single atom) = "(" ++ show atom ++ ")"
+  show (Prog atom prog gs) = "(" ++ show atom ++ ")." ++ prog ++ "." ++ show gs
 
 -- get the first atom of a guarded string
 first :: GuardedString -> Atom
