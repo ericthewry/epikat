@@ -34,7 +34,7 @@ data Declarations =
 data Context =
   Context { alphabetc :: Set AtomicTest
           , actionsc :: [Action]
-          , viewsc :: [(Agent, Auto -> Auto)]}
+          , viewsc :: [(Agent, Query -> Query)]}
 
 
 instance Show Context where
@@ -48,7 +48,7 @@ data Action = Action { name :: String
 
 data QueryResult =
   QAuto Auto
-  | QRel (Auto -> Auto)
+  | QRel (Query -> Query)
 
 instance Show QueryResult where
   show (QAuto auto) = show auto
@@ -88,16 +88,39 @@ projectAuto trueAct actAlts auto =
        , delta = delta'
        , final = final auto}
         
+binary combine recFun left right = (recFun left) `combine` (recFun right)
 
-compile_views :: Set AtomicTest -> Map AtomicProgram [AtomicProgram] -> Auto -> Auto
-compile_views alphabet view auto = Map.foldrWithKey projectAuto auto view
+compileView :: Map AtomicProgram [AtomicProgram] -> Query -> Query
+compileView _ QEmpty = QEmpty
+compileView _ QAll = QAll
+compileView view (QIdent s) =
+  case Map.lookup s view of
+    Nothing -> QIdent s
+    Just [] -> QIdent s
+    Just alts ->
+      foldr (QUnion (QIdent x)) QEmpty alts
+    
+compileView view (QApply q q') =
+  binary QApply (compileView view) q q'
+
+compileView view (QConcat q q') =
+  binary QConcat (compileView view) q q'
+
+compileView view (QUnion q q') =
+  binary QUnion (compileView view) q q'
+
+compileView view (QComplement q) =
+  QComplement $ compileView view q
+
+compileView view (QStar q) =
+  QStar $ compileView view q
 
 
 lookupAction :: [Action] -> AtomicProgram -> Maybe Action
 lookupAction [] _ = Nothing
 lookupAction (a:as) p = if name a == p then Just a else lookupAction as p
 
-lookupView :: [(Agent, Auto -> Auto)] -> Agent -> Maybe (Auto -> Auto)
+lookupView :: [(Agent, Query -> Query)] -> Agent -> Maybe (Query -> Query)
 lookupView [] _ = Nothing
 lookupView ((a, v): vs) agent = if a == agent then Just v else lookupView vs agent
 
@@ -127,24 +150,27 @@ compileQuery ctx (QIdent s) =
     (Just _, Just _) -> error ("Multiple occurences of name " ++ s)
     
 compileQuery ctx (QApply q q') =
-  case (compileQuery ctx q, compileQuery ctx q') of
-    (QAuto _, _) -> error "Type Error: Cannot Apply an Automaton as a function"
-    (QRel f, QRel f') -> QRel (\x -> f' (f x)) 
-    (QRel f, QAuto a) -> QAuto (f a)
+  case (compileQuery ctx q) of
+    (QAuto _) -> error "Type Error: Cannot Apply an Automaton as a function"
+    (QRel f) -> compileQuery ctx $ f q'
     
 compileQuery ctx (QConcat q q') =
   case (compileQuery ctx q, compileQuery ctx q') of
     (QAuto a, QAuto a') -> QAuto (a `concatAuto` a')
-    (QRel f, QAuto a) -> QRel (\x -> f x `concatAuto` a)
-    (QAuto a, QRel f) -> QRel (\x -> a `concatAuto` f x)
-    (QRel f, QRel f') -> QRel (\x -> f x `concatAuto` f' x)
+    (QRel f, QRel f') -> QRel (\x -> f x `QConcat` f' x)
+    (QRel f, QAuto a) -> error "cannot concat a function and an automaton"
+    (QAuto a, QRel f) -> error "cannot concat an automaton and a function"
+
       
 compileQuery ctx (QUnion q q') =
   case (compileQuery ctx q, compileQuery ctx q') of
     (QAuto a, QAuto a') -> QAuto (a `unionAuto` a')
-    (QAuto a, QRel f) -> QRel (\x -> f x `unionAuto` a)
-    (QRel f, QAuto a) -> QRel (\x -> f x `unionAuto` a)
-    (QRel f, QRel f') -> QRel (\x -> f x `unionAuto` f' x)
+    (QRel f, QRel f') -> QRel (\x -> f x `QUnion` f' x)
+    (_, _) -> error "Cannot union a function and an automaton"
+    -- (QAuto a, QAuto a') -> QAuto (a `unionAuto` a')
+    -- (QAuto a, QRel f) -> QRel (\x -> f x `unionAuto` a)
+    -- (QRel f, QAuto a) -> QRel (\x -> f x `` a)
+    -- (QRel f, QRel f') -> QRel (\x -> f x `QUnion` f' x)
     
 -- compileQuery ctx (QIntersect q q') = -- intersection is syntactic sugar
 --   compileQuery ctx $
@@ -153,7 +179,7 @@ compileQuery ctx (QUnion q q') =
 compileQuery ctx (QComplement q) =
   case compileQuery ctx q of
     QAuto a -> QAuto $ complementAuto (alphabetc ctx) a
-    QRel f -> QRel $ (\x -> complementAuto (alphabetc ctx) (f x))
+    QRel f -> QRel $ (\q -> QComplement $ f q)
 
 -- compileQuery ctx (QSubtract q q') = compileQuery ctx $
 --                                     q `QIntersect` QComplement q'
@@ -161,16 +187,15 @@ compileQuery ctx (QComplement q) =
 compileQuery ctx (QStar q) =
   case compileQuery ctx q of
     QAuto a -> QAuto $ iterateAuto a
-    QRel f -> QRel (\x -> iterateAuto $ f x)
+    QRel f -> QRel (\x -> QStar $ f x)
 
  
 compileDecls :: Declarations -> Context
-compileDecls decls =
-  let alpha = alphabet decls in
-  let asserts = assertions decls in
-  Context { alphabetc = alpha
-          , actionsc = map (\(n, p) -> compile_action n alpha asserts p) (actions decls)
-          , viewsc = map (\(a, m) -> (a, compile_views (alphabet decls) m)) (views decls)
+compileDecls (Program alphabet asserts actions views queries) =
+  let mapSnd f = map (\(a, x) -> (a, f x)) in
+  Context { alphabetc = alphabet
+          , actionsc = map (\(n, p) -> compile_action n alphabet asserts p) actions
+          , viewsc = mapSnd (compileView) views
           }
 
 runQueries :: Declarations -> [(QueryName, QueryResult)]
