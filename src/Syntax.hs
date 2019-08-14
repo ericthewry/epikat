@@ -1,5 +1,11 @@
 module Syntax where
 
+import Data.Map (Map)
+import qualified Data.Map as Map
+
+import Data.Set (Set)
+import qualified Data.Set as Set
+
 type AtomicProgram = String
 type AtomicTest = String
 
@@ -35,7 +41,7 @@ instance Show Test where
   show TTrue = "1"
   show TFalse = "0"
   show (TAnd p q) = show p ++ ";" ++ show q
-  show (TOr p q) = show p ++ " || " ++ show q
+  show (TOr p q) = show p ++ " + " ++ show q
   show (TVar v) = v
   show (TNeg x) = "~" ++ show x
 
@@ -67,9 +73,32 @@ instance Show Query  where
   show (QApply f x) = show f ++ "(" ++ show x ++ ")"
   -- show (QDomain q) = "dom(" ++ show q ++ ")"
   -- show (QCodom q) = "codom(" ++ show q ++ ")"
-  show (QConcat q q') = show q ++  " ^ " ++ show q'
+  show (QConcat q q') = show q ++  " ; " ++ show q'
   show (QUnion q q') = show q ++ " + " ++ show q'
   -- show (QIntersect q q') = show q ++ " & "  ++ show q'
   show (QComplement q) = "~" ++ show q
   -- show (QSubtract q q') = show q ++ " \\ " show q'
   show (QStar q) = "(" ++ show q ++ ")*"
+
+
+
+type Agent = String
+type QueryName = String
+type Param = String
+
+data Declarations =
+  Program { alphabet :: Set AtomicTest        -- the alphabet of world-states
+          , assertions :: [Test] -- conditions that specify consistent worlds
+          , actions :: [(AtomicProgram, Kat)] -- the world actions and their relations
+          , views :: [(Agent, Map AtomicProgram [AtomicProgram])] -- alternative relations
+          , queries :: [(QueryName, Query)] -- queries expressed in KAT
+          } deriving (Eq,Show)
+
+
+combineDecls decl decl' =
+  let join j f = f decl `j` f decl' in
+  Program { alphabet= join (Set.union) alphabet
+          , assertions = join (++) assertions
+          , actions = join (++) actions
+          , views = join  (++) views
+          , queries = join (++) queries }

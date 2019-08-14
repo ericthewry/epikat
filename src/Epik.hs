@@ -19,18 +19,6 @@ import BDD
 import Auto
 {- END INTERNAL MODULES -}
 
-type Agent = String
-type QueryName = String
-type Param = String
-
-data Declarations =
-  Program { alphabet :: Set AtomicTest        -- the alphabet of world-states
-          , assertions :: [Test] -- conditions that specify consistent worlds
-          , actions :: [(AtomicProgram, Kat)] -- the world actions and their relations
-          , views :: [(Agent, Map AtomicProgram [AtomicProgram])] -- alternative relations
-          , queries :: [(QueryName, Query)] -- queries expressed in KAT
-          } deriving (Eq,Show)
-
 data Context =
   Context { alphabetc :: Set AtomicTest
           , actionsc :: [Action]

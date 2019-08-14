@@ -31,3 +31,4 @@ tags
 better-cache/
 /subs/*/*.cabal
 stack*.yaml.lock
+_build

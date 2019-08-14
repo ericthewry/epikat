@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 457b75a38dbd649aeca07c0ae1033587ce6f1d8b14f95c4ad4eb7316d4f3cce7
+-- hash: 96877af27ce8a5aafa6182f7826538f6fb6a0190c59e318dc4ed5e3b3e741322
 
 name:           epik
 version:        0.1.0.0
@@ -31,14 +31,18 @@ library
       BDD
       Epik
       GuardedStrings
+      Lexer
+      Parser
       Syntax
   other-modules:
       Paths_epik
   hs-source-dirs:
       src
   build-depends:
-      base >=4.7 && <5
+      array
+    , base >=4.7 && <5
     , containers
+    , mtl
   default-language: Haskell2010
 
 executable epik-exe
@@ -49,9 +53,11 @@ executable epik-exe
       app
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      base >=4.7 && <5
+      array
+    , base >=4.7 && <5
     , containers
     , epik
+    , mtl
   default-language: Haskell2010
 
 test-suite epik-test
@@ -63,7 +69,9 @@ test-suite epik-test
       test
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      base >=4.7 && <5
+      array
+    , base >=4.7 && <5
     , containers
     , epik
+    , mtl
   default-language: Haskell2010
