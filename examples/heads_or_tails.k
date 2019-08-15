@@ -2,7 +2,7 @@ world = heads + tails
 
 assert ~(heads;tails)
 
-action nothing_happened = 0
+action nothing_happened = 0 
 
 action public_announce_heads = test heads
 action public_announce_tails = test tails
@@ -30,8 +30,7 @@ agent alice =
   (bobby_sneaks_heads -> nothing_happened)
   (bobby_sneaks_tails -> nothing_happened)
 
-
-agent bob =
+agent bobby =
   (nothing_happened -> nothing_happend)
   (public_announce_heads -> public_announce_heads)
   (public_announce_tails -> public_announce_tails)
@@ -49,15 +48,21 @@ query DoesEverAnnounce =
   1*;(public_announce_heads + public_announce_tails);1*
 
 query BobbySeesHeads =
-    (public_announce_heads + bobby_peeks_heads + bobby_sneaks_heads);
-    (public_announce_heads + bobby_peeks_heads + bobby_sneaks_heads)*
+  (public_announce_heads + bobby_peeks_heads + bobby_sneaks_heads);
+  (public_announce_heads + bobby_peeks_heads + bobby_sneaks_heads)*
 
 query WhatDoesAliceKnowAboutWorldsWhereBobSeesHeads =
   ~alice(
      ~((public_announce_heads + bobby_peeks_heads + bobby_sneaks_heads);
-       (public_announce_heads + bobby_peeks_heads + bobby_sneaks_heads)*)
+       (public_announce_heads + bobby_peeks_heads + bobby_sneaks_heads))
     )
 
+query AliceBelievesEverPublicAnnounceHeads =
+  ~alice(~(1*;public_announce_heads;1*))
 
+query AliceBelivesJustPublicAnnouncedHeads =
+  ~alice(~(1*;public_announce_heads))
 
+query AliceBelivesFirstPublicAnnouncedHeads =
+  ~alice(~(public_announce_heads;1*)) & 1;1;1
 

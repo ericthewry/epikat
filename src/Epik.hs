@@ -146,8 +146,8 @@ compileQuery ctx (QConcat q q') =
   case (compileQuery ctx q, compileQuery ctx q') of
     (QAuto a, QAuto a') -> QAuto (a `concatAuto` a')
     (QRel f, QRel f') -> QRel (\x -> f x `QConcat` f' x)
-    (QRel f, QAuto a) -> error "cannot concat a function and an automaton"
-    (QAuto a, QRel f) -> error "cannot concat an automaton and a function"
+    (QRel _, QAuto _) -> error "cannot concat a function and an automaton"
+    (QAuto _, QRel _) -> error "cannot concat an automaton and a function"
 
       
 compileQuery ctx (QUnion q q') =
@@ -155,10 +155,6 @@ compileQuery ctx (QUnion q q') =
     (QAuto a, QAuto a') -> QAuto (a `unionAuto` a')
     (QRel f, QRel f') -> QRel (\x -> f x `QUnion` f' x)
     (_, _) -> error "Cannot union a function and an automaton"
-    -- (QAuto a, QAuto a') -> QAuto (a `unionAuto` a')
-    -- (QAuto a, QRel f) -> QRel (\x -> f x `unionAuto` a)
-    -- (QRel f, QAuto a) -> QRel (\x -> f x `` a)
-    -- (QRel f, QRel f') -> QRel (\x -> f x `QUnion` f' x)
     
 -- compileQuery ctx (QIntersect q q') = -- intersection is syntactic sugar
 --   compileQuery ctx $
