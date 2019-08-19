@@ -54,7 +54,7 @@ ifElse cond tru fls = -- if (cond) { tru } else { fls } =^= cond ; tru + ~cond;f
 data Query = -- a relational alegebra for Queries
   QEmpty -- Uninhabited
   | QAll -- Inhabited by every string
-  | QIdent String -- An Agent, View, or Parameter
+  | QIdent String -- An Agent, View, or Previously-defined Query
   | QApply Query Query -- QApply f x is f(x)
   -- | QDomain Query -- get domain of agent's view
   -- | QCodom Query -- get codomain of agents' view

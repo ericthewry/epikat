@@ -9,6 +9,7 @@ action public_announce_tails = test tails
 
 action alice_peeks_heads  = test heads
 action alice_peeks_tails  = test tails
+
 action bobby_peeks_heads  = test heads
 action bobby_peeks_tails  = test tails
 
@@ -16,6 +17,8 @@ action alice_sneaks_heads = test heads
 action alice_sneaks_tails = test tails
 action bobby_sneaks_heads = test heads
 action bobby_sneaks_tails = test tails
+
+
 
 agent alice =
   (nothing_happened -> nothing_happened)
@@ -43,26 +46,16 @@ agent bobby =
   (bobby_sneaks_heads -> bobby_sneaks_heads)
   (bobby_sneaks_tails -> bobby_sneaks_tails)
 
+query BobbySawHeads =
+      1*;(public_announce_heads + bobby_peeks_heads + bobby_sneaks_heads);1*
 
-query DoesEverAnnounce =
-  1*;(public_announce_heads + public_announce_tails);1*
+query AliceOfBobbyDidntSeeHeads = alice(~BobbySawHeads)
 
-query BobbySeesHeads =
-  (public_announce_heads + bobby_peeks_heads + bobby_sneaks_heads);
-  (public_announce_heads + bobby_peeks_heads + bobby_sneaks_heads)*
+query AliceOfBobbyDidntSeeHeadsManual = alice(~((1*); (public_announce_heads + bobby_peeks_heads + bobby_sneaks_heads); (1*)))
 
-query WhatDoesAliceKnowAboutWorldsWhereBobSeesHeads =
-  ~alice(
-     ~((public_announce_heads + bobby_peeks_heads + bobby_sneaks_heads);
-       (public_announce_heads + bobby_peeks_heads + bobby_sneaks_heads))
-    )
+query WhatDoesAliceKnowAboutWorldsWhereBobSeesHeadsManual =
+  ~alice(~(1*;(public_announce_heads + bobby_peeks_heads + bobby_sneaks_heads);1*))
 
-query AliceBelievesEverPublicAnnounceHeads =
-  ~alice(~(1*;public_announce_heads;1*))
-
-query AliceBelivesJustPublicAnnouncedHeads =
-  ~alice(~(1*;public_announce_heads))
-
-query AliceBelivesFirstPublicAnnouncedHeads =
-  ~alice(~(public_announce_heads;1*)) & 1;1;1
-
+query WhatDoesAliceKnowAboutWorldsWhereBobSawHeads =
+  ~alice(~BobbySawHeads)
+  

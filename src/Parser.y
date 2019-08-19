@@ -49,9 +49,10 @@ import Control.Monad.Except
    '->'    { TArrow }
 
 -- Operator Associativity and Precedence
-%left '*' '~'
 %left ';'
 %left '+'
+%left '~'
+%right '*'
 %%
 
 

@@ -104,13 +104,8 @@ compileView view (QStar q) =
   QStar $ compileView view q
 
 
-lookupAction :: [Action] -> AtomicProgram -> Maybe Action
-lookupAction [] _ = Nothing
-lookupAction (a:as) p = if name a == p then Just a else lookupAction as p
-
-lookupView :: [(Agent, Query -> Query)] -> Agent -> Maybe (Query -> Query)
-lookupView [] _ = Nothing
-lookupView ((a, v): vs) agent = if a == agent then Just v else lookupView vs agent
+lookupAction :: AtomicProgram -> [Action] -> Maybe Action
+lookupAction p = find (\a -> name a == p)
 
 testFromAtom :: Atom -> Test
 testFromAtom Empty = TTrue
@@ -127,15 +122,19 @@ katFromAction act = Set.foldr (\(pre, post) kat ->
                                  katFromAtom post `KUnion` kat
                               ) End (relation act)
 
+scopeFor :: [(QueryName, Query)] -> QueryName -> [(QueryName, Query)]
+scopeFor qs name = takeWhile (\(n, _) -> n /= name) qs
+
+
 compileQuery :: Context -> Query -> QueryResult
-compileQuery ctx QEmpty = QAuto $ construct End 
-compileQuery ctx QAll = QAuto $ construct (KStar Nop)
+compileQuery _ QEmpty = QAuto $ construct End 
+compileQuery _ QAll = QAuto $ construct (KStar Nop)
 compileQuery ctx (QIdent s) =
-  case (lookupAction (actionsc ctx) s, lookupView (viewsc ctx) s)  of
+  case (s `lookupAction` actionsc ctx, s `lookup` (viewsc ctx)) of
     (Just a, Nothing) -> QAuto $ construct $ katFromAction a
     (Nothing, Just f) -> QRel f
     (Nothing, Nothing) -> error ("UseBeforeDef. Could not find name " ++ s)
-    (Just _, Just _) -> error ("Multiple occurences of name " ++ s)
+    (_, _) -> error ("Error. I found both an Agent and an Action with name " ++ s ++ ". Please resolve this ambiguity. By convention, actions should be in snake_case, and agents should be in full CamelCase")
     
 compileQuery ctx (QApply q q') =
   case (compileQuery ctx q) of
@@ -149,13 +148,12 @@ compileQuery ctx (QConcat q q') =
     (QRel _, QAuto _) -> error "cannot concat a function and an automaton"
     (QAuto _, QRel _) -> error "cannot concat an automaton and a function"
 
-      
 compileQuery ctx (QUnion q q') =
   case (compileQuery ctx q, compileQuery ctx q') of
     (QAuto a, QAuto a') -> QAuto (a `unionAuto` a')
     (QRel f, QRel f') -> QRel (\x -> f x `QUnion` f' x)
     (_, _) -> error "Cannot union a function and an automaton"
-    
+     
 -- compileQuery ctx (QIntersect q q') = -- intersection is syntactic sugar
 --   compileQuery ctx $
 --   QComplement $ QComplement q `QUnion` QComplement q'
@@ -173,19 +171,49 @@ compileQuery ctx (QStar q) =
     QAuto a -> QAuto $ iterateAuto a
     QRel f -> QRel (\x -> QStar $ f x)
 
- 
+
+mapSnd :: (a -> b) -> [(c, a)] -> [(c, b)]
+mapSnd f = map (\(x, y) -> (x, f y))
+  
 compileDecls :: Declarations -> Context
 compileDecls (Program alphabet asserts actions views queries) =
-  let mapSnd f = map (\(a, x) -> (a, f x)) in
   Context { alphabetc = alphabet
           , actionsc = map (\(n, p) -> compile_action n alphabet asserts p) actions
           , viewsc = mapSnd (compileView) views
           }
+binOp f c x y = c (f x) (f y)
+unOp f c x = c $ f x
+
+resolveRefs :: [(QueryName, Query)] -> Query -> Query
+resolveRefs scope QEmpty = QEmpty
+resolveRefs scope QAll = QAll
+resolveRefs scope (QIdent s) =
+  case s `lookup` scope  of
+    Nothing -> QIdent s
+    Just q -> q
+resolveRefs scope (QApply f x) =
+  binOp (resolveRefs scope) QApply f x
+resolveRefs scope (QConcat q q') =
+  binOp (resolveRefs scope) QConcat q q'
+resolveRefs scope (QUnion q q') =
+  binOp (resolveRefs scope) QUnion q q'
+resolveRefs scope (QComplement q) =
+  unOp (resolveRefs scope) QComplement q
+resolveRefs scope (QStar q) =
+  unOp (resolveRefs scope) QStar q
+  
+
+  
+
+
+  
+  
 
 runQueries :: Declarations -> [(QueryName, QueryResult)]
 runQueries decls =
   let context = compileDecls decls in
-    map (\(name, query) -> (name, compileQuery context query)) (queries decls)
+  let qs = queries decls in
+  map (\(name, q) -> (name, compileQuery context $ resolveRefs (scopeFor qs name) q)) qs
 
 qplus :: Query -> Query
 qplus query = query `QConcat` QStar query
@@ -204,4 +232,5 @@ showQueryResults decls =
                                        nub $
                                        toLoopFreeStrings (alphabet decls) a  in
                   name ++ " identifies the following (loop-free) strings:" ++ guardedStrings ++  "-----\n\n" ++ accStr
+                  -- name ++ " produces the automaton: \n " ++ show a ++ "----\n\n" ++ accStr
           ) "" queries
