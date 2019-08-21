@@ -58,9 +58,11 @@ last (Prog _ _ gs) = last gs
 --  if `last gs == first gs'`.
 -- Otherwise it evaluates to `None`. written in math via `<>`
 fuse :: GuardedString -> GuardedString -> Maybe GuardedString
-fuse (Single a) (Single b) | a == b = Just $ Single a
-                           | otherwise = Nothing
+-- fuse (Single a) (Single b) | a == b = Just $ Single a
+--                            | otherwise = Nothing
 fuse gs (Prog b q gs') = attach gs b q gs'
+fuse gs (Single b) | last gs == b = Just gs
+                   | otherwise = Nothing
 
 -- `attach` is an auxiliary function implementing `fuse`
 attach :: GuardedString -> Atom -> AtomicProgram -> GuardedString -> Maybe GuardedString

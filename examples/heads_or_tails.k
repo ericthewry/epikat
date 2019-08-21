@@ -25,14 +25,14 @@ agent alice =
   (alice_peeks_heads -> alice_peeks_heads)
   (alice_peeks_tails -> alice_peeks_tails)
   (bobby_peeks_heads -> bobby_peeks_heads + bobby_peeks_tails)
-  (bobby_peeks_tails -> bobby_peeks_tails + bobby_peeks_tails)
+  (bobby_peeks_tails -> bobby_peeks_heads + bobby_peeks_tails)
   (alice_sneaks_heads -> alice_sneaks_heads)
   (alice_sneaks_tails -> alice_sneaks_tails)
   (bobby_sneaks_heads -> nothing_happened)
   (bobby_sneaks_tails -> nothing_happened)
 
 agent bobby =
-  (nothing_happened -> nothing_happend)
+  (nothing_happened -> nothing_happened)
   (public_announce_heads -> public_announce_heads)
   (public_announce_tails -> public_announce_tails)
   (alice_peeks_heads -> alice_peeks_heads + alice_peeks_tails)
@@ -51,4 +51,40 @@ query AliceAndBobbySawHeads =
       (public_announce_heads + bobby_peeks_heads + bobby_sneaks_heads) & (public_announce_heads + alice_peeks_heads + alice_sneaks_heads)
 
 
-query AliceFromBobbyPeek = ~alice(~bobby_peeks_heads)
+query AliceKnowsBobbyPeekHeadsNNF = ~public_announce_heads
+      				  & ~public_announce_tails
+				  & ~alice_peeks_heads
+				  & ~alice_peeks_tails
+				  & ~bobby_peeks_tails
+				  & ~bobby_peeks_heads
+				  & ~alice_sneaks_heads
+				  & ~alice_sneaks_tails
+				  & ~nothing_happened
+				  & ~nothing_happened
+				  & ~nothing_happened
+
+
+query AliceKnowsBobbyPeekHeads1 = ~( public_announce_heads
+      				   + public_announce_tails
+				   + alice_peeks_heads
+				   + alice_peeks_tails
+				   + bobby_peeks_tails + bobby_peeks_heads
+				   + alice_sneaks_heads
+				   + alice_sneaks_tails
+				   + nothing_happened
+				   + nothing_happened
+				   + nothing_happened )
+                                  
+
+query AliceKnowsBobbyPeekHeads2 = ~alice( public_announce_heads
+					+ public_announce_tails
+					+ alice_peeks_heads
+					+ alice_peeks_tails
+					+ bobby_peeks_tails
+					+ alice_sneaks_heads
+					+ alice_sneaks_tails
+					+ bobby_sneaks_heads
+					+ bobby_sneaks_tails
+					+ nothing_happened)
+
+query AliceFromBobbyPeek3 = ~alice(~bobby_peeks_heads)

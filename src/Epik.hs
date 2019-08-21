@@ -71,23 +71,21 @@ atomicActions ctx = foldr (\x -> Set.insert (name x)) Set.empty (actionsc ctx)
 atoms :: Context -> [Atom]
 atoms ctx = induced_atoms (alphabetc ctx) $ assertion ctx  
 
-runQueries :: Declarations -> [(QueryName, Auto [State Atom Kat])]
+runQueries :: Declarations -> [(QueryName, Set GuardedString)]
 runQueries decls =
   let context = compileDecls decls in
   let qs = queries decls in
-  map (\(name, q) -> (name, compile context q)) qs
+  map (\(name, q) -> (name, computeGuardedStrings context q)) qs
 
-accShow :: Show a => String -> Maybe a -> String -> String
-accShow sep (Just x) str = sep ++ show x ++ str
-accShow _ Nothing str = str
+accShow :: Show a => String -> a -> String -> String
+accShow sep x str = sep ++ show x ++ str
 
 showQueryResults :: Declarations -> String
 showQueryResults decls =
   let queries = runQueries decls in
-    foldr (\(name,auto) accStr ->
-                let guardedStrings = Set.foldr (accShow "\n\t") "\n" $
-                                     loopFreeStrings auto  in
-                  name ++ " identifies the following (loop-free) strings:\n" ++ guardedStrings ++  "-----\n\n" ++ accStr
+    foldr (\(name, gsTraces) accStr ->
+                let gsStr = Set.foldr (accShow "\n\t") "\n" gsTraces  in
+                  name ++ " identifies the following (loop-free) strings:\n" ++ gsStr ++  "-----\n\n" ++ accStr
              -- name ++ " produces the automaton: \n " ++ show auto ++ "----\n\n" ++ accStr
           ) "" queries
 
@@ -140,16 +138,30 @@ negate ctx (KSeq k k') =
 negate ctx (KUnion k k') = negate ctx k ++ negate ctx k'
 negate ctx (KStar _ ) = [KZero]
 
-mkAutoL' :: Context -> Auto [State Atom Kat]
+mkAutoL' :: Context -> Kat -> Auto [State Atom Kat]
 mkAutoL' ctx = mkAutoL (atoms ctx) (Set.toList $ atomicActions ctx)
 
 
 compile :: Context -> Query -> Auto [State Atom Kat]
-compile ctx q =
+compile ctx query =
   foldr1 intersectAutoL $
-  mkAutoL' ctx `map` (
-  applyActionConditions (actionsc ctx) `map`
-  (nub $ katOfQuery ctx q))
+  mkAutoL' ctx `map`
+  desugar ctx query
+  
+desugar :: Context -> Query -> [Kat]
+desugar ctx query =
+  map (applyActionConditions (actionsc ctx))
+  $ nub $ katOfQuery ctx query
+
+
+computeGuardedStrings :: Context -> Query -> Set GuardedString
+computeGuardedStrings ctx query =
+  let kats = desugar ctx query in
+  if null kats then Set.empty else 
+  foldr1 Set.intersection $
+  map (gs_interp $ alphabetc ctx)
+  kats
+
 
 injectProg :: AtomicProgram -> (Atom, Atom) -> Kat
 injectProg a (pre, post) =
