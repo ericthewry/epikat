@@ -298,9 +298,9 @@ katOfQuery ctx (QStar q) = KStar `map` katOfQuery ctx q
 katOfQuery ctx (QComplement q) = negate ctx `concatMap` katOfQuery ctx q
 
 negate :: Context -> Kat -> [Kat] 
-negate ctx KZero = [Set.fold (KUnion . KVar) KEpsilon $ atomicActions ctx]
+negate ctx KZero = [Set.fold (KUnion . KVar) KZero $ atomicActions ctx]
 negate ctx KEpsilon = [KZero]
-negate ctx (KVar a) = [Set.fold (KUnion . KVar) KEpsilon $ Set.delete a $ atomicActions ctx]
+negate ctx (KVar a) = [Set.fold (KUnion . KVar) KZero $ Set.delete a $ atomicActions ctx]
 negate ctx (KTest t) = [KTest $ TNeg t]
 negate ctx (KSeq k k') =
   let neg nk nk' = KSeq nk k' `KUnion` KSeq k nk' in
