@@ -15,9 +15,10 @@ data Atom =
 
 instance Show Atom where
   show (Atom pos neg) =
-    "( " ++ 
-    Set.fold (\a -> (++) (" " ++ show a ++ " ")) " " pos ++
-    Set.fold (\a -> (++) ("~" ++ show a ++ " ")) " " neg ++ ")"
+    let join a rst = (if Set.member a neg then "~" else "") ++ show a ++ "" ++ rst in 
+    "(" ++ Set.fold join "" (Set.union pos neg) ++ ")"
+    -- Set.fold  "" pos ++
+    -- Set.fold (\a -> (++) ("~" ++ show a ++ "")) "" neg ++ ")"
 
 addPos :: AtomicTest -> Atom -> Atom
 addPos t a = Atom { posa = Set.insert t (posa a)
