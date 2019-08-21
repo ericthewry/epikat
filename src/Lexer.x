@@ -38,7 +38,9 @@ tokens :-
   [\+]             { \s -> TUnion }
   [\;]             { \s -> TSeq }
   [\*]             { \s -> TStar }
-  [\~]             { \s -> TNegate }
+  [\~]             { \s -> TTilde }
+  [\&]             { \s -> TAmper }
+  [\_]             { \s -> TUnderscore }
 
 {
 
@@ -49,7 +51,9 @@ data Token =
      | TTest
      | TUnion
      | TSeq
-     | TNegate
+     | TTilde
+     | TUnderscore
+     | TAmper
      | TStar
      | TLParen
      | TRParen

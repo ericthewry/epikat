@@ -135,4 +135,4 @@ main :: IO ()
 main = do
   args <- getArgs
   contents <- readFile $ head args
-  putStrLn $ showQueryResults $ parse contents
+  putStrLn $ show $ parse contents

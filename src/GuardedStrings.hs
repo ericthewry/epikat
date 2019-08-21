@@ -8,21 +8,24 @@ import qualified Data.Set as Set
 import Syntax
 import BDD
 
--- An atom can be `Empty`, or a sequence of AtomicTests tagged with `Pos` or
--- `Neg`. Intuitively, `AtomicTest`s tagged with `Pos` are true, and
--- `AtomicTest`s tagged with `Neg` are false.
 data Atom =
-  Empty
-  | Pos AtomicTest Atom
-  | Neg AtomicTest Atom
-  deriving (Eq,Ord)
+  Atom { posa :: (Set AtomicTest),
+         nega :: (Set AtomicTest) }
+  deriving (Eq, Ord)
 
 instance Show Atom where
-  show Empty = ""
-  show (Pos v Empty) = v
-  show (Neg v Empty) = "~" ++ v
-  show (Pos v a) = " " ++ v ++ " " ++ show a
-  show (Neg v a) = "~" ++ v ++ " " ++ show a
+  show (Atom pos neg) =
+    "( " ++ 
+    Set.fold (\a -> (++) (" " ++ show a ++ " ")) " " pos ++
+    Set.fold (\a -> (++) ("~" ++ show a ++ " ")) " " neg ++ ")"
+
+addPos :: AtomicTest -> Atom -> Atom
+addPos t a = Atom { posa = Set.insert t (posa a)
+                  , nega = Set.delete t (nega a) }
+
+addNeg :: AtomicTest -> Atom -> Atom
+addNeg t a = Atom { posa = Set.delete t (posa a)
+                  , nega = Set.insert t (nega a) }
   
 -- A guarded String is either a single atom `alpha`, or it is
 -- Cons-cell `alpha rho gs`, where `alpha` is an atom, `rho` is a
@@ -34,7 +37,7 @@ data GuardedString =
 
 instance Show GuardedString where
   show (Single atom) = "(" ++ show atom ++ ")"
-  show (Prog atom prog gs) = "(" ++ show atom ++ ")." ++ prog ++ "." ++ show gs
+  show (Prog atom prog gs) = "(" ++ show atom ++ ")." ++ show prog ++ "." ++ show gs
 
 -- get the first atom of a guarded string
 first :: GuardedString -> Atom
@@ -94,16 +97,14 @@ fixpointGS gs = lub gs Set.empty
 all_atoms :: Set AtomicTest -> [Atom]
 all_atoms alphabet =
   Set.foldr (\ letter atoms ->
-                map (\x -> Pos letter x) atoms
-                ++ map (\x -> Neg letter x) atoms
-               ) [Empty] alphabet
+                map (addPos letter) atoms
+                ++ map (addNeg letter) atoms
+               ) [Atom Set.empty Set.empty] alphabet
 
 -- Convert an atom to corresponding world `Pos` tests are true in the
 -- corresponding world, and `Neg` tests are false in the corresponding world.
-atomToWorld :: Atom -> Set AtomicTest
-atomToWorld Empty = Set.empty
-atomToWorld (Pos v a) = Set.insert v $ atomToWorld a
-atomToWorld (Neg v a) = atomToWorld a
+atomToWorld :: Atom -> World
+atomToWorld = World . posa
 
 -- Executes a BDD in the context of an atom 
 execAtom :: Atom -> BDD -> Bool
@@ -120,10 +121,10 @@ induced_atoms alphabet t = filter (\ a -> evalAtom a t) $ all_atoms alphabet
 -- Interprets a `Kat` expression in a given alphabet, producing its corresponding set of guarded strings
 -- [| p |]^X subset of GuardedString
 gs_interp :: Set AtomicTest -> Kat -> Set GuardedString
-gs_interp alphabet End = Set.empty
-gs_interp alphabet Nop =
+gs_interp alphabet KZero = Set.empty
+gs_interp alphabet KEpsilon =
   let atoms = all_atoms alphabet in
-    Set.fromList [Prog a "" (Single a) | a <- atoms]
+    Set.fromList [Prog a (AtomicProgram "1") (Single a) | a <- atoms]
 
 gs_interp alphabet (KTest t) =
   Set.fromList [(Single a) | a <- induced_atoms alphabet t]
@@ -137,13 +138,10 @@ gs_interp alphabet (KUnion p q) = gs_interp alphabet p `Set.union` gs_interp alp
 gs_interp alphabet (KStar p) = fixpointGS (gs_interp alphabet p)
 
 
-
-
-
 gs_assertion_interp :: Set AtomicTest -> Test -> Kat -> Set GuardedString
-gs_assertion_interp _ _ End = Set.empty
-gs_assertion_interp alphabet assertion Nop =
-  Set.fromList [Prog a "1" (Single a) | a <- induced_atoms alphabet assertion ]
+gs_assertion_interp _ _ KZero = Set.empty
+gs_assertion_interp alphabet assertion KEpsilon =
+  Set.fromList [Prog a (AtomicProgram "1") (Single a) | a <- induced_atoms alphabet assertion ]
 
 gs_assertion_interp alphabet assertion (KTest t) =
   Set.fromList [(Single a) | a <- induced_atoms alphabet (assertion `TAnd` t) ]
