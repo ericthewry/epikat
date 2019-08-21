@@ -1,6 +1,6 @@
 world = heads + tails
 
-assert ~(heads;tails)
+assert (~(heads&tails))&(heads+tails)
 
 action nothing_happened = 0 
 
@@ -17,8 +17,6 @@ action alice_sneaks_heads = test heads
 action alice_sneaks_tails = test tails
 action bobby_sneaks_heads = test heads
 action bobby_sneaks_tails = test tails
-
-
 
 agent alice =
   (nothing_happened -> nothing_happened)
@@ -46,16 +44,11 @@ agent bobby =
   (bobby_sneaks_heads -> bobby_sneaks_heads)
   (bobby_sneaks_tails -> bobby_sneaks_tails)
 
-query BobbySawHeads =
-      1*;(public_announce_heads + bobby_peeks_heads + bobby_sneaks_heads);1*
+query BobbySawHeadsOnce = public_announce_heads + bobby_peeks_heads + bobby_sneaks_heads
+query AliceSawHeadsOnce = public_announce_heads + alice_peeks_heads + alice_sneaks_heads
 
-query AliceOfBobbyDidntSeeHeads = alice(~BobbySawHeads)
+query AliceAndBobbySawHeads =
+      (public_announce_heads + bobby_peeks_heads + bobby_sneaks_heads) & (public_announce_heads + alice_peeks_heads + alice_sneaks_heads)
 
-query AliceOfBobbyDidntSeeHeadsManual = alice(~((1*); (public_announce_heads + bobby_peeks_heads + bobby_sneaks_heads); (1*)))
 
-query WhatDoesAliceKnowAboutWorldsWhereBobSeesHeadsManual =
-  ~alice(~(1*;(public_announce_heads + bobby_peeks_heads + bobby_sneaks_heads);1*))
-
-query WhatDoesAliceKnowAboutWorldsWhereBobSawHeads =
-  ~alice(~BobbySawHeads)
-  
+query AliceFromBobbyPeek = ~alice(~bobby_peeks_heads)

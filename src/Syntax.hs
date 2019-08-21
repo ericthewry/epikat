@@ -28,7 +28,7 @@ data Kat =
 instance Show Kat where
   show KZero = "0"
   show KEpsilon = "1"
-  show (KTest t) = show t
+  show (KTest t) = "(" ++ show t ++ ")"
   show (KSeq p q) = show p ++ ";" ++ show q
   show (KUnion p q) = show p ++ " + " ++ show q
   show (KStar p) = "(" ++ show p ++ ")*"
@@ -46,7 +46,7 @@ data Test =
 instance Show Test where
   show TTrue = "1"
   show TFalse = "0"
-  show (TAnd p q) = show p ++ ";" ++ show q
+  show (TAnd p q) = show p ++ "&" ++ show q
   show (TOr p q) = show p ++ " + " ++ show q
   show (TVar v) = show v
   show (TNeg x) = "~" ++ show x

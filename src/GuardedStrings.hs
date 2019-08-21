@@ -27,6 +27,10 @@ addPos t a = Atom { posa = Set.insert t (posa a)
 addNeg :: AtomicTest -> Atom -> Atom
 addNeg t a = Atom { posa = Set.delete t (posa a)
                   , nega = Set.insert t (nega a) }
+
+testOfAtom :: Atom -> Test
+testOfAtom (Atom pos neg) =
+  Set.foldr (TAnd . TVar) (Set.foldr (TAnd . TNeg . TVar) TTrue neg) pos
   
 -- A guarded String is either a single atom `alpha`, or it is
 -- Cons-cell `alpha rho gs`, where `alpha` is an atom, `rho` is a
