@@ -153,14 +153,9 @@ mkPair a b = (a,b)
 -- crossSetWith :: (Ord a, Ord a', Ord b, Ord c) =>
 --                 (a -> a' -> c) -> Set (b, a) -> Set (b, a') -> Set (b, c)
 crossSetWith combine xs ys =
-  Set.foldr
-  (\(cx, x) zs -> Set.foldr
-  (\(cy, y) zs' ->
-      if cx == cy
-      then Set.insert (cx,  x `combine` y) zs'
-      else zs
-  ) zs ys
-  ) Set.empty xs
+  Set.fromList [(c, combine x y) | (c, x) <- Set.toList xs
+                                 , (c', y) <- Set.toList ys
+                                 , c == c']
 
 -- crossSet :: (Ord a, Ord a', Ord b) => Set (b, a) -> Set (b, a') -> Set (b, (a,a'))
 -- crossSet = crossSetWith mkPair
