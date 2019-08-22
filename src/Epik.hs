@@ -91,7 +91,8 @@ atomicActions ctx = foldr (\x -> Set.insert (name x)) Set.empty (actionsc ctx)
 runQueries :: Declarations -> [(QueryName, [GuardedString])]
 runQueries decls =
   let context = compileDecls decls in
-  mapSnd (computeGuardedStrings context) $ queries decls
+  map (\(n, q) -> (,) n $ computeGuardedStrings context (scopeFor (queries decls) n) q) $
+  queries decls
 
 mapSnd :: (b -> c) -> [(a,b)] -> [(a,c)]
 mapSnd _ [] = []
@@ -116,7 +117,7 @@ showKatTerms decls =
   let ctx = compileDecls decls in
     concatMap (\(n, ks) -> n ++ " becomes KAT expressions: \n" ++
                 concatMap (\k -> "\t" ++ show k ++ "\n") ks ++ "\n") $
-    mapSnd (desugar ctx) $ queries decls
+    map (\(n, q) -> ( n, desugar ctx (scopeFor (queries decls) n) q)) $ queries decls
 
 
 
@@ -137,23 +138,27 @@ lift alt (KUnion k k') = lift alt k `KUnion` lift alt k'
 lift alt (KStar k) = KStar $ lift alt k
 
 
-katOfQuery :: Context -> Query -> [Kat]
-katOfQuery ctx QEmpty = [KZero]
-katOfQuery ctx QEpsilon = [KEpsilon]
-katOfQuery ctx QAll = [foldr (KUnion . KVar) KZero $ atomicActions ctx]
-katOfQuery ctx (QIdent s) = [KVar $ AtomicProgram s]
-katOfQuery ctx (QApply (QIdent agent) q) =
+katOfQuery :: Context -> [(QueryName, Query)] ->  Query -> [Kat]
+katOfQuery ctx scope QEmpty = [KZero]
+katOfQuery ctx scope QEpsilon = [KEpsilon]
+katOfQuery ctx scope QAll = [foldr (KUnion . KVar) KZero $ atomicActions ctx]
+katOfQuery ctx scope (QIdent s) =
+  case s `lookup` scope  of
+    Just q  -> katOfQuery ctx scope q
+    Nothing -> [KVar $ AtomicProgram s]
+katOfQuery ctx scope (QTest t) = [KTest t]
+katOfQuery ctx scope (QApply (QIdent agent) q) =
   case agent `lookup` viewsc ctx of
     Nothing -> error ("Could not find agent \"" ++ agent ++ "\"")
-    Just f  -> (lift f) `map` katOfQuery ctx q
-katOfQuery ctx (QApply _ _) = error "function application must be with an agent"
-katOfQuery ctx (QConcat q q') =
-  concatMap (\k -> KSeq k `map` katOfQuery ctx q') (katOfQuery ctx q)
-katOfQuery ctx (QUnion q q') =
-  concatMap (\k -> (KUnion k `map` katOfQuery ctx q')) (katOfQuery ctx q)
-katOfQuery ctx (QIntersect q q') = katOfQuery ctx q ++ katOfQuery ctx q'
-katOfQuery ctx (QStar q) = KStar `map` katOfQuery ctx q
-katOfQuery ctx (QComplement q) = negate ctx `concatMap` katOfQuery ctx q
+    Just f  -> (lift f) `map` katOfQuery ctx scope q
+katOfQuery ctx scope (QApply _ _) = error "function application must be with an agent"
+katOfQuery ctx scope (QConcat q q') =
+  concatMap (\k -> KSeq k `map` katOfQuery ctx scope q') (katOfQuery ctx scope q)
+katOfQuery ctx scope (QUnion q q') =
+  concatMap (\k -> (KUnion k `map` katOfQuery ctx scope q')) (katOfQuery ctx scope q)
+katOfQuery ctx scope (QIntersect q q') = katOfQuery ctx scope q ++ katOfQuery ctx scope q'
+katOfQuery ctx scope (QStar q) = KStar `map` katOfQuery ctx scope q
+katOfQuery ctx scope (QComplement q) = negate ctx `concatMap` katOfQuery ctx scope q
 
 negate :: Context -> Kat -> [Kat] 
 negate ctx KZero = [Set.fold (KUnion . KVar) KZero $ atomicActions ctx]
@@ -171,16 +176,16 @@ mkAutoL' :: Context -> Kat -> Auto [State Atom Kat]
 mkAutoL' ctx = mkAutoL (atomsc ctx) (Set.toList $ atomicActions ctx)
 
 
-compile :: Context -> Query -> Auto [State Atom Kat]
-compile ctx query =
-  foldr1 intersectAutoL $
-  mkAutoL' ctx `map`
-  desugar ctx query
+-- compile :: Context -> Query -> Auto [State Atom Kat]
+-- compile ctx query =
+--   foldr1 intersectAutoL $
+--   mkAutoL' ctx `map`
+--   desugar ctx query
   
-desugar :: Context -> Query -> [Kat]
-desugar ctx query =
+desugar :: Context -> [(QueryName, Query)] -> Query -> [Kat]
+desugar ctx scope query =
   map (substActions (actionsc ctx))
-  $ nub $ katOfQuery ctx query
+  $ nub $ katOfQuery ctx scope query
 
 allEqual :: Eq a => [a] -> Maybe a
 allEqual [] = Nothing
@@ -204,9 +209,9 @@ intersectLazy' = (mapMaybe headMaybe) . foldr ((mapMaybe (allEqual' . uncurry (:
   where headMaybe [] = Nothing
         headMaybe (x:_) = Just x
 
-computeGuardedStrings :: Context -> Query -> [GuardedString]
-computeGuardedStrings ctx query =
-  let kats = desugar ctx query in
+computeGuardedStrings :: Context -> [(QueryName, Query)] -> Query -> [GuardedString]
+computeGuardedStrings ctx scope query =
+  let kats = desugar ctx scope query in
   if null kats then [] else 
   intersectLazy' $
   map (gs_interp $ atomsc ctx)

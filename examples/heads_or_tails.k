@@ -103,4 +103,8 @@ query PublicAnnounceIter = (_;_) & (public_announce_heads;(public_announce_heads
 query Anything = _;(_*)
 
 
-query PublicAnnouncedFlip = (public_announce_heads + public_announce_tails);public_flip;(public_announce_heads + public_announce_tails)
+query PublicAnnounce = public_announce_heads + public_announce_tails
+
+query PublicAnnouncedFlips = PublicAnnounce;public_flip*;PublicAnnounce
+
+query EvenFlips = test heads; public_flip*; test heads

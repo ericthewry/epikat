@@ -122,6 +122,7 @@ QueryKat : '0'                          { QEmpty }
          | '_'                          { QAll }
          | '1'                          { QEpsilon }
          | IDENT                        { QIdent $1 }
+         | test Test                    { QTest $2 }
          | QueryKat '(' QueryKat ')'    { QApply $1 $3 }
          | QueryKat ';' QueryKat        { QConcat $1 $3 }
          | QueryKat '&' QueryKat        { QIntersect $1 $3 }

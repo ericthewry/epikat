@@ -62,6 +62,7 @@ data Query = -- a relational alegebra for Queries
   | QEpsilon -- the empty string
   | QAll -- Inhabited by every string
   | QIdent String -- An Agent, View, or Previously-defined Query
+  | QTest Test  -- check a test
   | QApply Query Query -- QApply f x is f(x)
   -- | QDomain Query -- get domain of agent's view
   -- | QCodom Query -- get codomain of agents' view
@@ -110,9 +111,3 @@ combineDecls decl decl' =
           , actions = join (++) actions
           , views = join  (++) views
           , queries = join (++) queries }
-
-
-
-
-
-
