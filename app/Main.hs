@@ -6,11 +6,12 @@ import qualified Data.Set as Set
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 
+import Data.Char
+
 import System.Environment (getArgs)
 
 import Syntax
 import GuardedStrings
-import Auto
 import Epik
 import Lexer
 import Parser
@@ -134,5 +135,7 @@ import Parser
 main :: IO ()
 main = do
   args <- getArgs
-  contents <- readFile $ head args
-  putStrLn $ showQueryResults $ parse contents
+  contents <- readFile $ head $ tail args
+  putStrLn $ if (map toLower $ head args) == "kat"
+             then showKatTerms $ parse contents
+             else showQueryResults (read $ head args) $ parse contents

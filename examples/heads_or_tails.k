@@ -2,7 +2,7 @@ world = heads + tails
 
 assert (~(heads&tails))&(heads+tails)
 
-action nothing_happened = 0 
+action nothing_happened = 1
 
 action public_announce_heads = test heads
 action public_announce_tails = test tails
@@ -51,6 +51,8 @@ query AliceAndBobbySawHeads =
       (public_announce_heads + bobby_peeks_heads + bobby_sneaks_heads) & (public_announce_heads + alice_peeks_heads + alice_sneaks_heads)
 
 
+query AliceKnowsBobbyPeekHeadsSoln = bobby_sneak_heads + bobby_sneak_tails
+
 query AliceKnowsBobbyPeekHeadsNNF = ~public_announce_heads
       				  & ~public_announce_tails
 				  & ~alice_peeks_heads
@@ -87,8 +89,9 @@ query AliceKnowsBobbyPeekHeads2 = ~alice( public_announce_heads
 					+ bobby_sneaks_tails
 					+ nothing_happened)
 
-query AliceKnowsBobbyPeekHeads3 = ~alice(~bobby_peeks_heads)
+query AliceKnowsBobbyPeekHeads3 = alice(~bobby_peeks_heads)
 
 
-query PublicAnnounceIter = _ & (public_announce_heads;(public_announce_heads + public_announce_tails)*)
+query PublicAnnounceIter = (_;_) & (public_announce_heads;(public_announce_heads + public_announce_tails)*)
 
+query Anything = _;(_*)

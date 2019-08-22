@@ -36,6 +36,7 @@ lookupAction p = find (\a -> name a == p)
   
 data Context =
   Context { alphabetc :: Set AtomicTest
+          , atomsc :: [Atom]
           , assertion :: Test
           , actionsc :: [Action]
           , viewsc :: [(Agent, Map AtomicProgram [AtomicProgram])]}
@@ -49,21 +50,23 @@ instance Show Context where
 
 
 
-compileAction :: AtomicProgram -> Set AtomicTest -> Test -> Kat -> Action
-compileAction name alphabet assert k =
+compileAction :: AtomicProgram -> [Atom] -> Kat -> Action
+compileAction name atoms k =
   Action { name = name
          , relation = Set.fromList $
                       map (\s -> (first s, last s)) $
-                      gs_assertion_interp alphabet assert k
+                      gs_interp atoms k
          }
 
 
 compileDecls :: Declarations -> Context
 compileDecls (Program alphabet asserts actions views queries) =
   let assertion = foldr TAnd TTrue asserts in
+  let atoms = inducedAtoms assertion $ allAtoms alphabet in
   Context { alphabetc = alphabet
+          , atomsc = atoms
           , assertion = assertion
-          , actionsc = map (\(n, p) -> compileAction n alphabet assertion p) actions
+          , actionsc = map (\(n, p) -> compileAction n atoms p) actions
           , viewsc = views
           }
 
@@ -73,30 +76,38 @@ scopeFor qs name = takeWhile (\(n, _) -> n /= name) qs
 atomicActions :: Context -> Set AtomicProgram
 atomicActions ctx = foldr (\x -> Set.insert (name x)) Set.empty (actionsc ctx)
 
-atoms :: Context -> [Atom]
-atoms ctx = induced_atoms (alphabetc ctx) $ assertion ctx  
+-- atomsCtx :: Context -> [Atom]
+-- atomsCtx ctx = inducedAtoms (assertion ctx) $ allAtoms (alphabetc ctx)
 
 runQueries :: Declarations -> [(QueryName, [GuardedString])]
 runQueries decls =
   let context = compileDecls decls in
-  let qs = queries decls in
-  myMap (\(name, q) -> (name, computeGuardedStrings context q)) qs
+  mapSnd (computeGuardedStrings context) $ queries decls
 
-myMap f [] = []
-myMap f (x:xs) = f x : myMap f xs
+mapSnd :: (b -> c) -> [(a,b)] -> [(a,c)]
+mapSnd _ [] = []
+mapSnd f ((x,y):xs) = (x, f y) : mapSnd f xs
   
 
 accShow :: Show a => String -> a -> String -> String
 accShow sep x str = sep ++ show x ++ str
 
-showQueryResults :: Declarations -> String
-showQueryResults decls =
+showQueryResults :: Int -> Declarations -> String
+showQueryResults num decls =
   let queries = runQueries decls in
     foldr (\(name, gsTraces) accStr ->
-                let gsStr = foldr (accShow "\n\t") "\n" (take 10 gsTraces)  in
+                let gsStr = foldr (accShow "\n\t") "\n" (sortOn gsLen$ take num gsTraces)  in
                   name ++ " identifies the following (loop-free) strings:\n" ++ gsStr ++  "-----\n\n" ++ accStr
              -- name ++ " produces the automaton: \n " ++ show auto ++ "----\n\n" ++ accStr
           ) "" queries
+
+
+showKatTerms :: Declarations -> String
+showKatTerms decls =
+  let ctx = compileDecls decls in
+    concatMap (\(n, ks) -> n ++ " becomes KAT expressions: \n" ++
+                concatMap (\k -> "\t" ++ show k ++ "\n") ks ++ "\n") $
+    mapSnd (desugar ctx) $ queries decls
 
 
 
@@ -148,7 +159,7 @@ negate ctx (KUnion k k') = negate ctx k ++ negate ctx k'
 negate ctx (KStar _ ) = [KZero]
 
 mkAutoL' :: Context -> Kat -> Auto [State Atom Kat]
-mkAutoL' ctx = mkAutoL (atoms ctx) (Set.toList $ atomicActions ctx)
+mkAutoL' ctx = mkAutoL (atomsc ctx) (Set.toList $ atomicActions ctx)
 
 
 compile :: Context -> Query -> Auto [State Atom Kat]
@@ -189,7 +200,7 @@ computeGuardedStrings ctx query =
   let kats = desugar ctx query in
   if null kats then [] else 
   intersectLazy' $
-  map (gs_interp $ alphabetc ctx)
+  map (gs_interp $ atomsc ctx)
   kats
 
 

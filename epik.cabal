@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 11467e1f14a3e6c299446667fd5e49c4afb2a9cf3e37397ceaa59c1fba5a488a
+-- hash: 7ea7e9dd10450bf53bdf01a8e019340d8ff7cdfad5ed5c32b98816c2900efa9f
 
 name:           epik
 version:        0.1.0.0
@@ -27,7 +27,6 @@ source-repository head
 
 library
   exposed-modules:
-      Auto
       AutoDeriv
       BDD
       Epik
