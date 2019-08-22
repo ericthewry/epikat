@@ -24,7 +24,7 @@ import AutoDeriv
 {- END INTERNAL MODULES -}
   
 data Action = Action { name :: AtomicProgram
-                     , relation :: Set (Atom, Atom)
+                     , program :: Kat
                      } deriving (Eq, Show)
 
 nameStr :: Action -> String
@@ -50,13 +50,22 @@ instance Show Context where
 
 
 
-compileAction :: AtomicProgram -> [Atom] -> Kat -> Action
-compileAction name atoms k =
-  Action { name = name
-         , relation = Set.fromList $
-                      map (\s -> (first s, last s)) $
-                      gs_interp atoms k
-         }
+compileAction :: AtomicProgram -> Kat -> Action
+compileAction name k =
+  Action { name = name, program = subst (AtomicProgram "id") name k }
+
+-- substiutes every occurence of obs for rplc in kat expr
+subst obs rplc KZero = KZero
+subst obs rplc KEpsilon = KEpsilon
+subst obs rplc (KTest t) = (KTest t)
+subst obs rplc (KVar x) | obs == x = KVar rplc
+                        | otherwise = KVar x
+subst obs rplc (KSeq k k') =
+  subst obs rplc k `KSeq` subst obs rplc k'
+subst obs rplc (KUnion k k') =
+  subst obs rplc k `KUnion` subst obs rplc k'
+subst obs rplc (KStar k) =
+  KStar $ subst obs rplc k
 
 
 compileDecls :: Declarations -> Context
@@ -66,7 +75,7 @@ compileDecls (Program alphabet asserts actions views queries) =
   Context { alphabetc = alphabet
           , atomsc = atoms
           , assertion = assertion
-          , actionsc = map (\(n, p) -> compileAction n atoms p) actions
+          , actionsc = map (\(n, p) -> compileAction n p) actions
           , viewsc = views
           }
 
@@ -170,7 +179,7 @@ compile ctx query =
   
 desugar :: Context -> Query -> [Kat]
 desugar ctx query =
-  map (applyActionConditions (actionsc ctx))
+  map (substActions (actionsc ctx))
   $ nub $ katOfQuery ctx query
 
 allEqual :: Eq a => [a] -> Maybe a
@@ -208,21 +217,21 @@ injectProg :: AtomicProgram -> (Atom, Atom) -> Kat
 injectProg a (pre, post) =
   KTest (testOfAtom pre) `KSeq` KVar a `KSeq` KTest (testOfAtom post)
 
-applyActionConditions :: [Action] -> Kat -> Kat
-applyActionConditions actions KZero = KZero
-applyActionConditions actions KEpsilon = KEpsilon
-applyActionConditions actions (KTest t) =  KTest t
-applyActionConditions actions (KVar p) =
+substActions :: [Action] -> Kat -> Kat
+substActions actions KZero = KZero
+substActions actions KEpsilon = KEpsilon
+substActions actions (KTest t) =  KTest t
+substActions actions (KVar p) =
   case p `lookupAction` actions of
     Nothing -> (KVar p)
-    Just a  -> Set.foldr (KUnion . injectProg p) KZero (relation a)
-applyActionConditions actions (KSeq k k') =
-  applyActionConditions actions k `KSeq`
-  applyActionConditions actions k'
-applyActionConditions actions (KUnion k k') =
-  applyActionConditions actions k `KUnion`
-  applyActionConditions actions k'
-applyActionConditions actions (KStar k) =
-  KStar $ applyActionConditions actions k
+    Just a  -> program a
+substActions actions (KSeq k k') =
+  substActions actions k `KSeq`
+  substActions actions k'
+substActions actions (KUnion k k') =
+  substActions actions k `KUnion`
+  substActions actions k'
+substActions actions (KStar k) =
+  KStar $ substActions actions k
 
 
