@@ -2,6 +2,8 @@ module GuardedStrings where
 
 import Prelude hiding (last)
 
+import Data.List hiding (last)
+
 import Data.Set (Set)
 import qualified Data.Set as Set
 
@@ -74,30 +76,46 @@ attach (Prog a p gs) b q gs' =
 
 -- computes the `fuse` of two guarded strings and inserts the result into to a set
 -- thereof if the `fuse` succeeds, otherwise, just return the set
-inner :: GuardedString -> GuardedString -> Set GuardedString -> Set GuardedString
+inner :: GuardedString -> GuardedString -> [GuardedString] -> [GuardedString]
 inner x y strings = case fuse x y of
                       Nothing -> strings
-                      Just xy -> Set.insert xy strings
+                      Just xy -> xy : strings
 
 -- for a GuardedString `gs` and a set `X`, compute `gs <> X`.
-fuseCoset :: GuardedString -> Set GuardedString -> Set GuardedString
-fuseCoset x = Set.foldr (inner x) Set.empty 
+fuseCoset :: GuardedString -> [GuardedString] -> [GuardedString]
+fuseCoset x = foldr (inner x) [] 
               
 -- for two sets of guarded strings `X` and `Y`, compute `X <> Y`
-setFuse :: Set GuardedString -> Set GuardedString -> Set GuardedString
-setFuse xs ys =
-  Set.foldr (\x strings -> fuseCoset x ys `Set.union` strings) Set.empty xs
+listFuse :: [GuardedString] -> [GuardedString] -> [GuardedString]
+listFuse xs ys =
+  foldr (\x -> (++) $ fuseCoset x ys) [] xs
 
 -- Compute the fixpoint of the set-lifted fuse operation
-lub :: Set GuardedString -> Set GuardedString -> Set GuardedString
-lub gsSet prev =
-  let next = (gsSet `setFuse` prev) `Set.union` prev in
-  if next == prev
-  then next
-  else lub gsSet next
+lubG :: Integer -> [GuardedString] -> [GuardedString] -> [GuardedString]
+lubG 0 _ prev = prev
+lubG gas gStrings prev =
+  prev ++
+  let next = (gStrings `listFuse` prev) in
+    if next == prev then next else lubG (gas-1) gStrings next
 
-fixpointGS :: Set GuardedString -> Set GuardedString
-fixpointGS gs = lub gs Set.empty
+takeUnique :: Integer -> [GuardedString] -> [GuardedString]
+takeUnique = takeUniqueAux []
+  where takeUniqueAux seen i [] = []
+        takeUniqueAux seen 0 _ = []
+        takeUniqueAux seen i (x:xs)
+          | x `elem` seen = takeUniqueAux seen i xs
+          | otherwise     = x : takeUniqueAux (x:seen) (i-1) xs
+
+
+lubInf :: [GuardedString] -> [GuardedString] -> [GuardedString]
+lubInf gStrings prev =
+  prev ++
+  let next = (gStrings `listFuse` prev) in
+    if next == prev then next else lubInf gStrings next
+
+
+fixpointGS :: [Atom] -> [GuardedString] -> [GuardedString]
+fixpointGS atoms gs = lubG 1000 gs $ map Single atoms
 
 -- For a given set of atomic tests, i.e. an alphabet, compute all atoms that
 -- could arise out of combining the elements of the alphabet
@@ -127,38 +145,43 @@ induced_atoms alphabet t = filter (\ a -> evalAtom a t) $ all_atoms alphabet
 
 -- Interprets a `Kat` expression in a given alphabet, producing its corresponding set of guarded strings
 -- [| p |]^X subset of GuardedString
-gs_interp :: Set AtomicTest -> Kat -> Set GuardedString
-gs_interp alphabet KZero = Set.empty
+gs_interp :: Set AtomicTest -> Kat -> [GuardedString]
+gs_interp alphabet KZero = []
 gs_interp alphabet KEpsilon =
   let atoms = all_atoms alphabet in
-    Set.fromList [Prog a (AtomicProgram "1") (Single a) | a <- atoms]
-
+  nub [Prog a (AtomicProgram "1") (Single a) | a <- atoms]
+ 
 gs_interp alphabet (KTest t) =
-  Set.fromList [(Single a) | a <- induced_atoms alphabet t]
+  nub [(Single a) | a <- induced_atoms alphabet t]
     
 gs_interp alphabet (KVar v) =
   let atoms = all_atoms alphabet in
-  Set.fromList [ Prog a v (Single b)  | a <- atoms, b <- atoms ]
+  nub [ Prog a v (Single b)  | a <- atoms, b <- atoms ]
 
-gs_interp alphabet (KSeq p q) = gs_interp alphabet p `setFuse` gs_interp alphabet q
-gs_interp alphabet (KUnion p q) = gs_interp alphabet p `Set.union` gs_interp alphabet q
-gs_interp alphabet (KStar p) = fixpointGS (gs_interp alphabet p)
+gs_interp alphabet (KSeq p q) = gs_interp alphabet p `listFuse` gs_interp alphabet q
+gs_interp alphabet (KUnion p q) = gs_interp alphabet p `union` gs_interp alphabet q
+gs_interp alphabet (KStar p) = fixpointGS (all_atoms alphabet) (gs_interp alphabet p)
 
 
-gs_assertion_interp :: Set AtomicTest -> Test -> Kat -> Set GuardedString
-gs_assertion_interp _ _ KZero = Set.empty
+gs_assertion_interp :: Set AtomicTest -> Test -> Kat -> [GuardedString]
+gs_assertion_interp _ _ KZero = []
 gs_assertion_interp alphabet assertion KEpsilon =
-  Set.fromList [Prog a (AtomicProgram "1") (Single a) | a <- induced_atoms alphabet assertion ]
+  nub [Prog a (AtomicProgram "1") (Single a) | a <- induced_atoms alphabet assertion ]
 
 gs_assertion_interp alphabet assertion (KTest t) =
-  Set.fromList [(Single a) | a <- induced_atoms alphabet (assertion `TAnd` t) ]
+  nub [(Single a) | a <- induced_atoms alphabet (assertion `TAnd` t) ]
 
 gs_assertion_interp alphabet assertion (KVar v) =
   let atoms = induced_atoms alphabet assertion in
-  Set.fromList [ Prog a v (Single b) | a <- atoms, b <- atoms ]
+  nub [ Prog a v (Single b) | a <- atoms, b <- atoms ]
 
-gs_assertion_interp alphabet assertion (KSeq p q) = gs_assertion_interp alphabet assertion p
-                                                     `setFuse` gs_assertion_interp alphabet assertion q
-gs_assertion_interp alphabet assertion (KUnion p q) = gs_assertion_interp alphabet assertion p
-                                                       `Set.union` gs_assertion_interp alphabet assertion q
-gs_assertion_interp alphabet assertion (KStar p) = lub (gs_assertion_interp alphabet assertion p) Set.empty
+gs_assertion_interp alphabet assertion (KSeq p q) =
+  gs_assertion_interp alphabet assertion p
+  `listFuse` gs_assertion_interp alphabet assertion q
+gs_assertion_interp alphabet assertion (KUnion p q) =
+  gs_assertion_interp alphabet assertion p
+  `union` gs_assertion_interp alphabet assertion q
+gs_assertion_interp alphabet assertion (KStar p) =
+  fixpointGS (induced_atoms alphabet assertion) $
+  gs_assertion_interp alphabet assertion p
+

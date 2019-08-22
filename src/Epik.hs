@@ -2,13 +2,17 @@ module Epik where
 
 import Prelude hiding (last, negate)
 
-import Data.List hiding (last)
+import Data.List hiding (last, intersect)
+
+import Data.Universe.Helpers
 
 import Data.Set (Set)
 import qualified Data.Set as Set
 
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
+
+import Data.Maybe
 
 import qualified Data.Either as Either
 
@@ -48,7 +52,8 @@ instance Show Context where
 compileAction :: AtomicProgram -> Set AtomicTest -> Test -> Kat -> Action
 compileAction name alphabet assert k =
   Action { name = name
-         , relation = Set.map (\s -> (first s, last s)) $
+         , relation = Set.fromList $
+                      map (\s -> (first s, last s)) $
                       gs_assertion_interp alphabet assert k
          }
 
@@ -71,11 +76,15 @@ atomicActions ctx = foldr (\x -> Set.insert (name x)) Set.empty (actionsc ctx)
 atoms :: Context -> [Atom]
 atoms ctx = induced_atoms (alphabetc ctx) $ assertion ctx  
 
-runQueries :: Declarations -> [(QueryName, Set GuardedString)]
+runQueries :: Declarations -> [(QueryName, [GuardedString])]
 runQueries decls =
   let context = compileDecls decls in
   let qs = queries decls in
-  map (\(name, q) -> (name, computeGuardedStrings context q)) qs
+  myMap (\(name, q) -> (name, computeGuardedStrings context q)) qs
+
+myMap f [] = []
+myMap f (x:xs) = f x : myMap f xs
+  
 
 accShow :: Show a => String -> a -> String -> String
 accShow sep x str = sep ++ show x ++ str
@@ -84,7 +93,7 @@ showQueryResults :: Declarations -> String
 showQueryResults decls =
   let queries = runQueries decls in
     foldr (\(name, gsTraces) accStr ->
-                let gsStr = Set.foldr (accShow "\n\t") "\n" gsTraces  in
+                let gsStr = foldr (accShow "\n\t") "\n" (take 10 gsTraces)  in
                   name ++ " identifies the following (loop-free) strings:\n" ++ gsStr ++  "-----\n\n" ++ accStr
              -- name ++ " produces the automaton: \n " ++ show auto ++ "----\n\n" ++ accStr
           ) "" queries
@@ -153,12 +162,33 @@ desugar ctx query =
   map (applyActionConditions (actionsc ctx))
   $ nub $ katOfQuery ctx query
 
+allEqual :: Eq a => [a] -> Maybe a
+allEqual [] = Nothing
+allEqual [x] = Just x
+allEqual (x:x':xs) | x == x' = allEqual (x':xs)
+                   | otherwise  = Nothing
 
-computeGuardedStrings :: Context -> Query -> Set GuardedString
+
+
+allEqual' :: Eq a => [a] -> Maybe [a]
+allEqual' [] = Nothing
+allEqual' [x] = Just [x]
+allEqual' (x:x':xs) | x == x' = allEqual' (x':xs) >>= Just . ((:) x)
+                   | otherwise  = Nothing
+
+intersectLazy :: Eq a => [[a]] -> [a]
+intersectLazy = (mapMaybe allEqual) . choices
+
+intersectLazy' :: Eq a => [[a]] -> [a]
+intersectLazy' = (mapMaybe headMaybe) . foldr ((mapMaybe (allEqual' . uncurry (:)) .) . (+*+)) [[]]
+  where headMaybe [] = Nothing
+        headMaybe (x:_) = Just x
+
+computeGuardedStrings :: Context -> Query -> [GuardedString]
 computeGuardedStrings ctx query =
   let kats = desugar ctx query in
-  if null kats then Set.empty else 
-  foldr1 Set.intersection $
+  if null kats then [] else 
+  intersectLazy' $
   map (gs_interp $ alphabetc ctx)
   kats
 

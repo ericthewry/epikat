@@ -240,19 +240,19 @@ normalize (Just t) (CTest t' : rst) = normalize (Just $ TAnd t t') rst
 
 -- `gsFromCondList alphabet trace` computes a GuardedString from a trace
 -- PRE: cond must be normalized
-gsFromCondList :: Set AtomicTest -> [Cond] -> Set GuardedString
-gsFromCondList alphabet [] = Set.empty
+gsFromCondList :: Set AtomicTest -> [Cond] -> [GuardedString]
+gsFromCondList alphabet [] = []
 gsFromCondList alphabet [CTest t] = gs_interp alphabet (KTest t)
 gsFromCondList alphabet (CTest t : CProg p : rst) =
-  Set.foldr (\ gstring -> Set.union $ Set.fromList $
-                          (\a -> Prog a p gstring) `map`
-                          (induced_atoms alphabet t)
-            ) Set.empty $
+  foldr (\ gstring -> union $ 
+                     (\a -> Prog a p gstring) `map`
+                     (induced_atoms alphabet t)
+       ) [] $
   gsFromCondList alphabet rst
 gsFromCondList _ p = error ("Malformed path: " ++ show p ++ "\nPlease normalize the input path to gsFromCondList")
 
 -- Computes the set of GuardedStrings indicated by an automaton path by `normalize`ing and calling `gsFromCondList`.
-gsFromPath :: Set AtomicTest -> Path -> Set GuardedString
+gsFromPath :: Set AtomicTest -> Path -> [GuardedString]
 gsFromPath alphabet path =
   let condsOnly = Either.rights path in
   let normPath = normalize Nothing condsOnly in
@@ -263,7 +263,7 @@ gsFromPath alphabet path =
 -- states) from an automaton
 toLoopFreeStrings :: Set AtomicTest -> Auto -> [GuardedString]
 toLoopFreeStrings alphabet a =
-                foldr (\p rst -> (Set.toList (gsFromPath alphabet p)) ++ rst) [] $
+                foldr (\p rst -> ( gsFromPath alphabet p) ++ rst) [] $
                 autoDFS a (start a) [Left (start a)]
 
 

@@ -24,6 +24,8 @@ dependencies:
 - containers
 - array
 - mtl
+- universe
+- universe-base
 
 library:
   source-dirs: src

@@ -87,4 +87,8 @@ query AliceKnowsBobbyPeekHeads2 = ~alice( public_announce_heads
 					+ bobby_sneaks_tails
 					+ nothing_happened)
 
-query AliceFromBobbyPeek3 = ~alice(~bobby_peeks_heads)
+query AliceKnowsBobbyPeekHeads3 = ~alice(~bobby_peeks_heads)
+
+
+query PublicAnnounceIter = _ & (public_announce_heads;(public_announce_heads + public_announce_tails)*)
+
