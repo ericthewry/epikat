@@ -55,17 +55,20 @@ compileAction name k =
   Action { name = name, program = subst (AtomicProgram "id") name k }
 
 -- substiutes every occurence of obs for rplc in kat expr
-subst obs rplc KZero = KZero
-subst obs rplc KEpsilon = KEpsilon
-subst obs rplc (KTest t) = (KTest t)
-subst obs rplc (KVar x) | obs == x = KVar rplc
-                        | otherwise = KVar x
-subst obs rplc (KSeq k k') =
-  subst obs rplc k `KSeq` subst obs rplc k'
-subst obs rplc (KUnion k k') =
-  subst obs rplc k `KUnion` subst obs rplc k'
-subst obs rplc (KStar k) =
-  KStar $ subst obs rplc k
+subst obs rplc KZ = kzero
+subst obs rplc KEps = kepsilon
+subst obs rplc (KBool t) = ktest t
+subst obs rplc (KEvent x) | obs == x = kvar rplc
+                        | otherwise = kvar x
+subst obs rplc (KSequence k k') =
+  subst obs rplc k `kseq` subst obs rplc k' 
+subst obs rplc (KPlus k k') =
+  subst obs rplc k `kunion` subst obs rplc k'
+subst obs rplc (KAnd k k') =
+  subst obs rplc k `kand` subst obs rplc k'
+subst obs rplc (KIter k) =
+  kstar $ subst obs rplc k
+
 
 
 compileDecls :: Declarations -> Context
@@ -140,15 +143,30 @@ showKatTerms decls =
 ----------------------------------------------------------------------------------
 
 lift :: Map AtomicProgram [AtomicProgram] -> Kat -> Kat
-lift alt KZero = KZero
-lift alt KEpsilon = KEpsilon
-lift alt (KTest t) = KTest t
-lift alt (KVar a) = case a `Map.lookup` alt of
-  Nothing -> KVar a
-  Just as -> foldr (KUnion . KVar ) KZero as
-lift alt (KSeq k k') = lift alt k `KSeq` lift alt k'
-lift alt (KUnion k k') = lift alt k `KUnion` lift alt k'
-lift alt (KStar k) = KStar $ lift alt k
+lift alt KZ = kzero             
+lift alt KEps = kepsilon
+lift alt (KBool t) = ktest t
+lift alt (KEvent a) = case a `Map.lookup` alt of
+  Nothing -> kvar a
+  Just as -> foldr (kunion . kvar ) kzero as
+lift alt (KSequence k k') = lift alt k `kseq` lift alt k'
+lift alt (KPlus k k') = lift alt k `kunion` lift alt k'
+lift alt (KIter k) = kstar $ lift alt k
+
+liftQ :: Map AtomicProgram [AtomicProgram] -> Query -> Query
+liftQ alt QEmpty = QEmpty  
+liftQ alt QAll = QAll
+liftQ alt QEpsilon = QEpsilon
+liftQ alt (QTest t) = QTest t
+liftQ alt (QIdent a) = case (AtomicProgram a) `Map.lookup` alt of
+  Nothing -> QIdent a
+  Just as -> foldr (QUnion . QIdent . show ) QEmpty as
+liftQ alt q@(QApply _ _) = error ("nested QApply could not be resolved for expr " ++ show q)
+liftQ alt (QConcat q q') = liftQ alt q `QConcat` liftQ alt q'
+liftQ alt (QUnion q q') = liftQ alt q `QUnion` liftQ alt q'
+liftQ alt (QIntersect q q') = liftQ alt q `QIntersect` liftQ alt q'
+liftQ alt (QComplement q) = QComplement $ liftQ alt q
+liftQ alt (QStar k) = QStar $ liftQ alt k
 
 lookupQ :: String -> QueryData -> Maybe Query
 lookupQ n [] = Nothing
@@ -156,67 +174,66 @@ lookupQ n ((n', _, q):qs) = if n == n' then Just q
                             else lookupQ n qs
 
 katOfQuery :: Context -> QueryData ->  Query -> [Kat]
-katOfQuery ctx scope QEmpty = [KZero]
-katOfQuery ctx scope QEpsilon = [KEpsilon]
-katOfQuery ctx scope QAll = [Set.foldr (KUnion . KVar) KZero $ atomicActions ctx]
+katOfQuery ctx scope QEmpty = [kzero]
+katOfQuery ctx scope QEpsilon = [kepsilon]
+katOfQuery ctx scope QAll = [Set.foldr (kunion . kvar) kzero $ atomicActions ctx]
 katOfQuery ctx scope (QIdent s) =
   case s `lookupQ` scope  of
     Just q  -> katOfQuery ctx scope q
-    Nothing -> [KVar $ AtomicProgram s]
-katOfQuery ctx scope (QTest t) = [KTest t]
+    Nothing -> [kvar $ AtomicProgram s]
+katOfQuery ctx scope (QTest t) = [ktest t]
 katOfQuery ctx scope (QApply (QIdent agent) q) =
   case agent `lookup` viewsc ctx of
     Nothing -> error ("Could not find agent \"" ++ agent ++ "\"")
-    Just f  -> (lift f) `map` katOfQuery ctx scope q -- lift this to operate on Queries
+    Just f  -> katOfQuery ctx scope $ liftQ f q
 katOfQuery ctx scope (QApply _ _) = error "function application must be with an agent"
 katOfQuery ctx scope (QConcat q q') =
-  concatMap (\k -> KSeq k `map` katOfQuery ctx scope q') (katOfQuery ctx scope q)
+  [kseq k k' | k <- katOfQuery ctx scope q, k' <- katOfQuery ctx scope q ]
 katOfQuery ctx scope (QUnion q q') =
-  concatMap (\k -> (KUnion k `map` katOfQuery ctx scope q')) (katOfQuery ctx scope q)
+  [ kunion k k' | k <- katOfQuery ctx scope q, k' <- katOfQuery ctx scope q']
 katOfQuery ctx scope (QIntersect q q') =
-  katOfQuery ctx scope q ++ katOfQuery ctx scope q'
+  [ kand k k' | k <- katOfQuery ctx scope q, k' <- katOfQuery ctx scope q']
 katOfQuery ctx scope (QStar q) =
-    KStar `map` katOfQuery ctx scope q
+  [ kstar k | k <- katOfQuery ctx scope q ]
 katOfQuery ctx scope (QComplement q) =
   case q of
-    QAll -> [KZero]
-    QEpsilon ->  [KZero]
-    QEmpty -> [KEpsilon]
+    QAll -> [kzero]
+    QEpsilon ->  [kzero]
+    QEmpty -> [kepsilon]
     QComplement q -> katOfQuery ctx scope q
-    QTest t -> [KTest $ TNeg t]
+    QTest t -> [ktest $ TNeg t]
     QIdent s -> case s `lookupQ` scope  of
                   Just q  -> katOfQuery ctx scope q
-                  Nothing -> [Set.fold (KUnion . KVar) KZero $
+                  Nothing -> [Set.fold (kunion . kvar) kzero $
                               Set.delete (AtomicProgram s) $ atomicActions ctx]
-                             
-    q@(QApply _ _) ->  negate ctx `concatMap` katOfQuery ctx scope q
-    QUnion q q' -> katOfQuery ctx scope (QComplement q) `union`
-                   katOfQuery ctx scope (QComplement q')
-    QConcat q q' -> uncurry (KUnion . uncurry KUnion) `map`
-                    ((katOfQuery ctx scope (QComplement q `QConcat` q')
-                     +*+
-                     katOfQuery ctx scope (q `QConcat` QComplement q'))
-                     +*+
-                     katOfQuery ctx scope (QComplement q `QConcat` QComplement q')
-                    )
-    QIntersect q q' -> uncurry KUnion `map`
-                       (katOfQuery ctx scope (QComplement q)
-                        +*+
-                        katOfQuery ctx scope (QComplement q'))
-    QStar q -> [KZero]
+    (QApply (QIdent agent)  q') ->
+      case agent `lookup` viewsc ctx of
+        Nothing -> error ("Could not find agent \"" ++ agent ++ "\"")
+        Just f  -> katOfQuery ctx scope $ QComplement $ liftQ f q'
+    (QApply q _ ) -> error ("LHS of application must be agent, not " ++ show q)
+    QUnion q q' -> katOfQuery ctx scope $
+                   QIntersect (QComplement q) (QComplement q')
+    QConcat q q' -> katOfQuery ctx scope $
+                    QUnion (QConcat (QComplement q) q') $
+                    QUnion (QConcat q $ QComplement q') $
+                    QConcat (QComplement q) (QComplement q')
+
+    QIntersect q q' -> katOfQuery ctx scope
+                       (QComplement q `QUnion` QComplement q')
+    QStar q -> [kzero]
 -- katOfQuery ctx scope (QComplement q) = negate ctx `concatMap` katOfQuery ctx scope q
 
-negate :: Context -> Kat -> [Kat] 
-negate ctx KZero = [Set.fold (KUnion . KVar) KZero $ atomicActions ctx]
-negate ctx KEpsilon = [KZero]
-negate ctx (KVar a) = [Set.fold (KUnion . KVar) KZero $
-                       Set.delete a $ atomicActions ctx]
-negate ctx (KTest t) = [KTest $ TNeg t]
-negate ctx (KSeq k k') =
-  let neg nk nk' = KSeq nk k' `KUnion` KSeq k nk' in
-  concatMap (\nk -> (map (neg nk) (negate ctx k'))) $ negate ctx k
-negate ctx (KUnion k k') = negate ctx k ++ negate ctx k'
-negate ctx (KStar _ ) = [KZero]
+-- negate :: Context -> Kat -> [Kat] 
+-- negate ctx KZero = [Set.fold (KUnion . KVar) KZero $ atomicActions ctx]
+-- negate ctx KEpsilon = [KZero]
+-- negate ctx (KVar a) = [Set.fold (KUnion . KVar) KZero $
+--                        Set.delete a $ atomicActions ctx]
+-- negate ctx (KTest t) = [KTest $ TNeg t]
+-- negate ctx (KSeq k k') =
+--   let neg nk nk' = KSeq nk k' `KUnion` KSeq k nk' in
+--   concatMap (\nk -> (map (neg nk) (negate ctx k'))) $ negate ctx k
+-- negate ctx (KUnion k k') = negate ctx k ++ negate ctx k'
+-- negate ctx (KStar _ ) = [KZero]
 
 mkAutoL' :: Context -> Kat -> Auto [State Atom Kat]
 mkAutoL' ctx = mkAutoL (atomsc ctx) (Set.toList $ atomicActions ctx)
@@ -228,20 +245,20 @@ compile ctx scope query =
   mkAutoL' ctx `map`
   desugar ctx scope query
 
-divideUnions :: Kat -> [Kat]
-divideUnions (KUnion k KZero) = divideUnions k
-divideUnions (KUnion KZero k') = divideUnions k'
-divideUnions (KUnion k k') = divideUnions k ++ divideUnions k'
-divideUnions k = [k]
+-- divideUnions :: Kat -> [Kat]
+-- divideUnions (KUnion k KZero) = divideUnions k
+-- divideUnions (KUnion KZero k') = divideUnions k'
+-- divideUnions (KUnion k k') = divideUnions k ++ divideUnions k'
+-- divideUnions k = [k]
 
-restoreUnions :: Set Kat -> Kat
-restoreUnions = Set.fold (KUnion) KZero
+-- restoreUnions :: Set Kat -> Kat
+-- restoreUnions = Set.fold (KUnion) KZero
 
-factorUnions :: [Set Kat] -> (Set Kat, [[Kat]])
-factorUnions ks =
-  let commonUnions = foldr1 Set.intersection ks in
-  let remainder = map (\us -> Set.toList (us `Set.difference` commonUnions)) ks in
-  (commonUnions, remainder)
+-- factorUnions :: [Set Kat] -> (Set Kat, [[Kat]])
+-- factorUnions ks =
+--   let commonUnions = foldr1 Set.intersection ks in
+--   let remainder = map (\us -> Set.toList (us `Set.difference` commonUnions)) ks in
+--   (commonUnions, remainder)
 
 fstApply :: (a -> b) -> (a,c) -> (b, c)
 fstApply f (x, y) = (f x, y)
@@ -278,15 +295,15 @@ intersectLazy' = (mapMaybe headMaybe) . foldr ((mapMaybe (allEqual' . uncurry (:
 
 unroll :: Int -> Kat -> Kat
 unroll 0 k = k
-unroll _ KZero = KZero
-unroll _ KEpsilon = KEpsilon
-unroll _ (KVar v) = KVar v
-unroll _ (KTest t) = KTest t
-unroll n (KSeq k k') = unroll n k `KSeq` unroll n k'
-unroll n (KUnion k k') = unroll n k `KUnion` unroll n k'
-unroll n (KStar k) =
+unroll _ KZ = kzero
+unroll _ KEps = kepsilon
+unroll _ (KEvent v) = kvar v
+unroll _ (KBool t) = ktest t
+unroll n (KSequence k k') = unroll n k `kseq` unroll n k'
+unroll n (KPlus k k') = unroll n k `kunion` unroll n k'
+unroll n (KIter k) =
   let k' = unroll n k in
-    KUnion KEpsilon $ KSeq k' $ unroll (n-1) $ KStar k'
+    kunion kepsilon $ kseq k' $ unroll (n-1) $ kstar k'
 
 computeGuardedStrings :: Context -> QueryData -> Query -> [GuardedString]
 computeGuardedStrings ctx scope query =
@@ -300,23 +317,26 @@ computeGuardedStrings ctx scope query =
 
 injectProg :: AtomicProgram -> (Atom, Atom) -> Kat
 injectProg a (pre, post) =
-  KTest (testOfAtom pre) `KSeq` KVar a `KSeq` KTest (testOfAtom post)
+  ktest (testOfAtom pre) `kseq` kvar a `kseq` ktest (testOfAtom post)
 
 substActions :: [Action] -> Kat -> Kat
-substActions actions KZero = KZero
-substActions actions KEpsilon = KEpsilon
-substActions actions (KTest t) =  KTest t
-substActions actions (KVar p) =
+substActions actions KZ = kzero
+substActions actions KEps = kepsilon
+substActions actions (KBool t) =  ktest t
+substActions actions (KEvent p) =
   case p `lookupAction` actions of
-    Nothing -> (KVar p)
+    Nothing -> (kvar p)
     Just a  -> program a
-substActions actions (KSeq k k') =
-  substActions actions k `KSeq`
+substActions actions (KSequence k k') =
+  substActions actions k `kseq`
   substActions actions k'
-substActions actions (KUnion k k') =
-  substActions actions k `KUnion`
+substActions actions (KPlus k k') =
+  substActions actions k `kunion`
   substActions actions k'
-substActions actions (KStar k) =
-  KStar $ substActions actions k
+substActions actions (KAnd k k') =
+  substActions actions k `kand`
+  substActions actions k'
+substActions actions (KIter k) =
+  kstar $ substActions actions k
 
 

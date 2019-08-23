@@ -16,23 +16,53 @@ instance Show AtomicTest where
   show (AtomicTest s) = s
 
 data Kat =
-  KZero -- End :: Kat
-  | KEpsilon -- Nop :: Kat
-  | KTest Test -- KTest :: Test -> Kat
-  | KVar AtomicProgram -- KVar :: AtomicProgram -> Kat
-  | KSeq Kat Kat       -- KSeq :: Kat -> Kat -> Kat  
-  | KUnion Kat Kat     -- KUnion :: Kat -> Kat -> Kat
-  | KStar Kat          -- KStar :: Kat -> Kat
+  KZ -- End :: Kat
+  | KEps -- Nop :: Kat
+  | KBool Test -- KTest :: Test -> Kat
+  | KEvent AtomicProgram -- KVar :: AtomicProgram -> Kat
+  | KSequence Kat Kat       -- KSeq :: Kat -> Kat -> Kat  
+  | KPlus Kat Kat     -- KUnion :: Kat -> Kat -> Kat
+  | KAnd Kat Kat 
+  | KIter Kat          -- KStar :: Kat -> Kat
   deriving (Eq, Ord)
 
 instance Show Kat where
-  show KZero = "0"
-  show KEpsilon = "1"
-  show (KTest t) = "(" ++ show t ++ ")"
-  show (KSeq p q) = show p ++ ";" ++ show q
-  show (KUnion p q) = show p ++ " + " ++ show q
-  show (KStar p) = "(" ++ show p ++ ")*"
-  show (KVar s) = show s
+  show KZ = "0"
+  show KEps = "1"
+  show (KBool t) = "(" ++ show t ++ ")"
+  show (KEvent s) = show s
+  show (KSequence p q) = show p ++ ";" ++ show q
+  show (KPlus p q) = "(" ++ show p ++ " + " ++ show q ++ ")"
+  show (KAnd p q) = "(" ++ show p ++ " & " ++ show q ++ ")"
+  show (KIter p) = "(" ++ show p ++ ")*"
+
+kzero = KZ
+kepsilon = KEps
+kvar = KEvent
+
+kseq KEps k' = k'
+kseq k KEps = k
+kseq KZ _ = KZ
+kseq _ KZ = KZ
+kseq (KBool t) (KBool t') = ktest (t `TAnd` t')
+kseq k k' = KSequence k k'
+
+kunion KZ k' = k'
+kunion k KZ = k
+kunion (KBool t) (KBool t') = ktest (t `TOr` t')
+kunion k k' = KPlus k k'
+
+kstar (KEps) = kepsilon
+kstar (KZ) = kzero
+kstar (KIter k) = kstar k
+kstar k = KIter k
+
+ktest = KBool
+
+kand KZ _ = KZ
+kand _ KZ = KZ
+kand k k' = KAnd k k'
+
 
 data Test =
   TTrue
@@ -54,8 +84,8 @@ instance Show Test where
 
 ifElse :: Test -> Kat -> Kat -> Kat
 ifElse cond tru fls = -- if (cond) { tru } else { fls } =^= cond ; tru + ~cond;fls
-  (KTest cond `KSeq` tru)
-  `KUnion` (KTest (TNeg cond) `KSeq` fls)
+  (ktest cond `kseq` tru)
+  `kunion` (ktest (TNeg cond) `kseq` fls)
 
 data Query = -- a relational alegebra for Queries
   QEmpty -- Uninhabited

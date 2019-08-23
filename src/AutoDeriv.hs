@@ -66,7 +66,7 @@ addTrans :: (Ord a, Ord k) => State a k -> Cond -> State a k -> Delta (State a k
 addTrans s c s' = Map.insertWith (Set.union) s (Set.singleton (c, s'))
 
 
-setSeq ps qs = Set.fold (\q rst -> Set.map (\p -> KSeq p q) ps `Set.union` rst) Set.empty qs
+setSeq ps qs = Set.fold (\q rst -> Set.map (\p -> kseq p q) ps `Set.union` rst) Set.empty qs
 
 binop :: (a -> b) -> (b -> b -> b) -> a -> a -> b
 binop f op x y = f x `op` f y
@@ -75,34 +75,36 @@ atomToWorld :: Atom -> World
 atomToWorld = World . posa
 
 nullable :: Atom -> Kat -> Bool
-nullable atom KZero = False
-nullable atom KEpsilon = True
-nullable atom (KVar _) = False
-nullable atom (KTest t) = eval (atomToWorld atom) t
-nullable atom (KUnion k k') = binop (nullable atom) (||) k k'
-nullable atom (KSeq k k') = binop (nullable atom) (&&) k k'
-nullable atom (KStar k) = True
+nullable atom KZ = False
+nullable atom KEps = True
+nullable atom (KEvent _) = False
+nullable atom (KBool t) = eval (atomToWorld atom) t
+nullable atom (KPlus k k') = binop (nullable atom) (||) k k'
+nullable atom (KSequence k k') = binop (nullable atom) (&&) k k'
+nullable atom (KAnd k k') = binop (nullable atom) (&&) k k'
+nullable atom (KIter k) = True
 
 accepting :: State Atom Kat -> Bool
 accepting (AtExp (at, expr)) = nullable at expr
 accepting (Exp _) = False
 
 deriv :: AtomicProgram -> (Atom, Kat) -> Set Kat
-deriv act (atom, KZero) = Set.empty
-deriv act (atom, KEpsilon) = Set.empty
-deriv act (atom, KVar act') | act == act' = Set.singleton KEpsilon
-                           | otherwise = Set.empty
-deriv act (atom, KTest _ ) = Set.empty                           
-deriv act (atom, KUnion k k') = deriv act (atom, k) `Set.union` deriv act (atom, k')
-deriv act (atom, KSeq k k') =
+deriv act (atom, KZ) = Set.empty
+deriv act (atom, KEps) = Set.empty
+deriv act (atom, KEvent act') | act == act' = Set.singleton kepsilon 
+                              | otherwise = Set.empty
+deriv act (atom, KBool _ ) = Set.empty                           
+deriv act (atom, KPlus k k') = deriv act (atom, k) `Set.union` deriv act (atom, k')
+deriv act (atom, KAnd k k') = deriv act (atom, k) `Set.intersection` deriv act (atom, k')
+deriv act (atom, KSequence k k') =
   (if nullable atom k
    then deriv act (atom, k')
    else Set.empty)
   `Set.union`
-  Set.fromList [k'' `KSeq` k' | k'' <- Set.toList $ deriv act (atom, k)]
+  Set.fromList [k'' `kseq` k' | k'' <- Set.toList $ deriv act (atom, k)]
 
-deriv act (atom, k'@(KStar k)) =
-  Set.fromList [k'' `KSeq` k' | k'' <- Set.toList $ deriv act (atom, k) ]
+deriv act (atom, ks@(KIter k)) =
+  Set.fromList [k' `kseq` ks | k' <- Set.toList $ deriv act (atom, k) ]
 
 derivE :: Atom -> Kat -> Set (State Atom Kat)
 derivE atom k = Set.singleton $ AtExp (atom , k)

@@ -96,13 +96,13 @@ Test : '0'                              { TFalse }
 Action : action IDENT '=' Kat           { [(AtomicProgram $2, $4)] }
 
 
-Kat : '0'                               { KZero }
-    | '1'                               { KEpsilon }
-    | IDENT                             { KVar (AtomicProgram $1) }
-    | test Test                         { KTest $2 }
-    | Kat ';' Kat                       { KSeq $1 $3 }
-    | Kat '+' Kat                       { KUnion $1 $3 }
-    | Kat '*'                           { KStar $1 }
+Kat : '0'                               { kzero } 
+    | '1'                               { kepsilon }
+    | IDENT                             { kvar (AtomicProgram $1) }
+    | test Test                         { ktest $2 }
+    | Kat ';' Kat                       { kseq $1 $3 }
+    | Kat '+' Kat                       { kunion $1 $3 }
+    | Kat '*'                           { kstar $1 }
     | '(' Kat ')'                       { $2 }
 
 

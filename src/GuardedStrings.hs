@@ -160,19 +160,20 @@ inducedAtoms t = filter (\ a -> evalAtom a t)
 -- Interprets a `Kat` expression in a given alphabet, producing its corresponding set of guarded strings
 -- [| p |]^X subset of GuardedString
 gs_interp :: [Atom] -> Kat -> [GuardedString]
-gs_interp atoms KZero = []
-gs_interp atoms KEpsilon =
+gs_interp atoms KZ = []
+gs_interp atoms KEps =
   [(Single a) | a <- atoms]
  
-gs_interp atoms (KTest t) =
+gs_interp atoms (KBool t) =
   [(Single a) | a <- inducedAtoms t atoms]
     
-gs_interp atoms (KVar v) =
+gs_interp atoms (KEvent v) =
   [ Prog a v (Single b)  | a <- atoms, b <- atoms ]
 
-gs_interp atoms (KSeq p q) = gs_interp atoms p `listFuse` gs_interp atoms q
-gs_interp atoms (KUnion p q) = gs_interp atoms p +++ gs_interp atoms q
-gs_interp atoms (KStar p) = fixpointGS atoms $ gs_interp atoms p
+gs_interp atoms (KSequence p q) = gs_interp atoms p `listFuse` gs_interp atoms q
+gs_interp atoms (KPlus p q) = gs_interp atoms p +++ gs_interp atoms q
+gs_interp atoms (KAnd p q) = map fst $ filter (uncurry (==)) $ gs_interp atoms p +*+ gs_interp atoms q
+gs_interp atoms (KIter p) = fixpointGS atoms $ gs_interp atoms p
 
 
 
