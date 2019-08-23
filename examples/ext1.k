@@ -51,9 +51,15 @@ query IntersectionUnion1 =
 query Heads = (_*) ; (test heads)
 query Tails = (_*) ; (test tails)
 
-query NotHeads = ~Heads
-query NotTails = ~Tails
+-- negates the Heads query
+query NotHeads = ~Heads #an erased comment
+-- written as ~Tails
+query NotTails = ~Tails #look a comment (it won't show up)
 
+ # this comment can occur anywhere and isnt' kept
+-- Here's a comment About NotHeadsThree
+-- And another continuation of the same comment
+-- They will be attached to the query in the output
 query NotHeadsThree = NotHeads & (_;_;_)
 
 

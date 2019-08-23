@@ -79,8 +79,8 @@ compileDecls (Program alphabet asserts actions views queries) =
           , viewsc = views
           }
 
-scopeFor :: [(QueryName, Query)] -> QueryName -> [(QueryName, Query)]
-scopeFor qs name = takeWhile (\(n, _) -> n /= name) qs
+scopeFor :: QueryData -> QueryName -> QueryData
+scopeFor qs name = takeWhile (\(n, _, _) -> n /= name) qs
 
 atomicActions :: Context -> Set AtomicProgram
 atomicActions ctx = foldr (\x -> Set.insert (name x)) Set.empty (actionsc ctx)
@@ -88,17 +88,18 @@ atomicActions ctx = foldr (\x -> Set.insert (name x)) Set.empty (actionsc ctx)
 -- atomsCtx :: Context -> [Atom]
 -- atomsCtx ctx = inducedAtoms (assertion ctx) $ allAtoms (alphabetc ctx)
 
-runQueries :: Declarations -> [(QueryName, [GuardedString])]
+runQueries :: Declarations -> [(QueryName, String, [GuardedString])]
 runQueries decls =
   let context = compileDecls decls in
-  map (\(n, q) -> (,) n $ computeGuardedStrings context (scopeFor (queries decls) n) q) $
+  map (\(n, c, q) -> (n, c, computeGuardedStrings context (scopeFor (queries decls) n) q)) $
   queries decls
 
-runQueriesAuto :: Declarations -> [(QueryName, [GuardedString])]
+runQueriesAuto :: Declarations -> [(QueryName, String, [GuardedString])]
 runQueriesAuto decls =
   let ctx = compileDecls decls in
-    mapSnd (\ n -> mapMaybe id . Set.toList .
-                   loopFreeStrings . (compile ctx $ scopeFor (queries decls) n)) $
+    map (\(n,c,q) -> (n, c,
+                      mapMaybe id $ Set.toList $
+                      loopFreeStrings $ (compile ctx $ scopeFor (queries decls) n) q)) $
     queries decls
 
 mapSnd :: (a -> b -> c) -> [(a,b)] -> [(a,c)]
@@ -112,19 +113,24 @@ accShow sep x str = sep ++ show x ++ str
 showQueryResults :: Int -> Bool -> Declarations -> String
 showQueryResults num useStrings decls =
   let queries = if useStrings then runQueries decls else runQueriesAuto decls in
-    foldr (\(name, gsTraces) accStr ->
+    foldr (\(name, comments, gsTraces) accStr ->
                 let gsStr = foldr (accShow "\n\t") "\n" (sortOn gsLen$ takeUnique num gsTraces)  in
-                  name ++ " identifies the following (loop-free) strings:\n" ++ gsStr ++  "-----\n\n" ++ accStr
+                let header = name ++ " identifies the following strings:" in
+                let footer = replicate (length header `div` 2) '+' in
+                  comments ++ "\n" ++ 
+                  header ++ "\n" ++
+                  gsStr ++ "\n" ++ 
+                  footer ++ "\n\n" ++ accStr
              -- name ++ " produces the automaton: \n " ++ show auto ++ "----\n\n" ++ accStr
           ) "" queries
 
 showKatTerms :: Declarations -> String
 showKatTerms decls =
   let ctx = compileDecls decls in
-    concatMap (\(n, aks) -> n ++ " becomes KAT expressions: \n" ++
+    concatMap (\(n, cs, aks) -> cs ++ "\n" ++ n ++ " becomes KAT expressions: \n" ++
                 -- "\t" ++ show ukat ++ "\n\t+\n" ++
                 concatMap (\k -> "\t" ++ show k ++ "\n") aks ++ "\n") $
-    map (\(n, q) -> ( n, desugar ctx (scopeFor (queries decls) n) q)) $ queries decls
+    map (\(n,c, q) -> ( n, c, desugar ctx (scopeFor (queries decls) n) q)) $ queries decls
 
 
 
@@ -144,13 +150,17 @@ lift alt (KSeq k k') = lift alt k `KSeq` lift alt k'
 lift alt (KUnion k k') = lift alt k `KUnion` lift alt k'
 lift alt (KStar k) = KStar $ lift alt k
 
+lookupQ :: String -> QueryData -> Maybe Query
+lookupQ n [] = Nothing
+lookupQ n ((n', _, q):qs) = if n == n' then Just q
+                            else lookupQ n qs
 
-katOfQuery :: Context -> [(QueryName, Query)] ->  Query -> [Kat]
+katOfQuery :: Context -> QueryData ->  Query -> [Kat]
 katOfQuery ctx scope QEmpty = [KZero]
 katOfQuery ctx scope QEpsilon = [KEpsilon]
 katOfQuery ctx scope QAll = [Set.foldr (KUnion . KVar) KZero $ atomicActions ctx]
 katOfQuery ctx scope (QIdent s) =
-  case s `lookup` scope  of
+  case s `lookupQ` scope  of
     Just q  -> katOfQuery ctx scope q
     Nothing -> [KVar $ AtomicProgram s]
 katOfQuery ctx scope (QTest t) = [KTest t]
@@ -174,7 +184,7 @@ katOfQuery ctx scope (QComplement q) =
     QEmpty -> [KEpsilon]
     QComplement q -> katOfQuery ctx scope q
     QTest t -> [KTest $ TNeg t]
-    QIdent s -> case s `lookup` scope  of
+    QIdent s -> case s `lookupQ` scope  of
                   Just q  -> katOfQuery ctx scope q
                   Nothing -> [Set.fold (KUnion . KVar) KZero $
                               Set.delete (AtomicProgram s) $ atomicActions ctx]
@@ -212,7 +222,7 @@ mkAutoL' :: Context -> Kat -> Auto [State Atom Kat]
 mkAutoL' ctx = mkAutoL (atomsc ctx) (Set.toList $ atomicActions ctx)
 
 
-compile :: Context -> [(QueryName, Query)] -> Query -> Auto [State Atom Kat]
+compile :: Context -> QueryData -> Query -> Auto [State Atom Kat]
 compile ctx scope query =
   foldr1 intersectAutoL $
   mkAutoL' ctx `map`
@@ -236,7 +246,7 @@ factorUnions ks =
 fstApply :: (a -> b) -> (a,c) -> (b, c)
 fstApply f (x, y) = (f x, y)
   
-desugar :: Context -> [(QueryName, Query)] -> Query -> [Kat]
+desugar :: Context -> QueryData -> Query -> [Kat]
 desugar ctx scope query =
   -- factorUnions $
   -- map divideUnions $ -- [Set Kat]
@@ -278,7 +288,7 @@ unroll n (KStar k) =
   let k' = unroll n k in
     KUnion KEpsilon $ KSeq k' $ unroll (n-1) $ KStar k'
 
-computeGuardedStrings :: Context -> [(QueryName, Query)] -> Query -> [GuardedString]
+computeGuardedStrings :: Context -> QueryData -> Query -> [GuardedString]
 computeGuardedStrings ctx scope query =
 --  let (unionKat, andKats) = desugar ctx scope query in
   let kats = desugar ctx scope query in

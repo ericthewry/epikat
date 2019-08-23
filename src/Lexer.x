@@ -20,6 +20,8 @@ $ident = [$alpha $digit \_ \']
 
 tokens :-
   $white +         ;
+  "#".*            ;
+  "--".*           { \s -> TComment s }
   assert           { \s -> TAssert }
   action           { \s -> TAction }
   agent            { \s -> TAgent }
@@ -48,6 +50,7 @@ data Token =
      TZero
      | TOne
      | TId String
+     | TComment String
      | TTest
      | TUnion
      | TSeq

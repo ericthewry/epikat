@@ -2,12 +2,12 @@ world = heads + tails
 
 assert (~(heads&tails))&(heads+tails)
 
-action nothing_happened = id
+action nothing_happened = ((test heads;id;test heads) + (test tails;id;test tails))
 
 action public_announce_heads = test heads;id;test heads
 action public_announce_tails = test tails;id;test tails
 
-action alice_peeks_heads  = test heads;id;test tails
+action alice_peeks_heads  = test heads;id;test heads
 action alice_peeks_tails  = test tails;id;test tails
 
 action bobby_peeks_heads  = test heads;id;test heads
@@ -102,9 +102,14 @@ query PublicAnnounceIter = (_;_) & (public_announce_heads;(public_announce_heads
 
 query Anything = _;(_*)
 
+query Heads = _;test heads
 
 query PublicAnnounce = public_announce_heads + public_announce_tails
 
 query PublicAnnouncedFlips = PublicAnnounce;public_flip*;PublicAnnounce
 
 query EvenFlips = test heads; public_flip*; test heads
+
+query AliceNotEndingInHeads = alice(~(_*;test heads))
+
+query AliceKnowsHeads = alice(_*; test heads)

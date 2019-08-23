@@ -140,7 +140,6 @@ parseArgs ("auto":n:f:_) = (f, False, read n, True)
 parseArgs (n:f:_) = (f, False, read n, False) -- If no command given, default to GS model
 parseArgs args = error ("Unrecognized arguments " ++ intercalate " " args)
   
-  
 main :: IO ()
 main = do
   args <- getArgs

@@ -90,17 +90,18 @@ instance Show Query  where
   show (QStar q) = "(" ++ show q ++ ")*"
 
 
-
 type Agent = String
 type QueryName = String
-type Param = String
+type NamedQuery = (QueryName, String, Query)
+type QueryData = [NamedQuery]
+
 
 data Declarations =
   Program { alphabet :: Set AtomicTest        -- the alphabet of world-states
           , assertions :: [Test] -- conditions that specify consistent worlds
           , actions :: [(AtomicProgram, Kat)] -- the world actions and their relations
           , views :: [(Agent, Map AtomicProgram [AtomicProgram])] -- alternative relations
-          , queries :: [(QueryName, Query)] -- queries expressed in KAT
+          , queries :: QueryData -- queries expressed in KAT
           } deriving (Eq,Show)
 
 

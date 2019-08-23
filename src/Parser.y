@@ -35,6 +35,7 @@ import Control.Monad.Except
    query   { TQuery }
    test    { TTest }
    IDENT   { TId $$ }
+   COMMENT { TComment $$ }
    '='     { TEq }
    '('     { TLParen }
    ')'     { TRParen }
@@ -67,7 +68,7 @@ Declaration : Alphabet                    { Program $1        [] [] [] [] }
             | Assertion                   { Program Set.empty $1 [] [] [] }
             | Action                      { Program Set.empty [] $1 [] [] }
             | View                        { Program Set.empty [] [] $1 [] }
-            | Query                       { Program Set.empty [] [] [] $1 }
+            | Query                       { Program Set.empty [] [] [] [$1] }
             | '{' Declaration '}'         { $2 }
 
 
@@ -116,8 +117,13 @@ AltList : IDENT                         { [AtomicProgram $1] }
 
 
 -- queries
-Query : query IDENT '=' QueryKat        { [($2, $4)] }
+Query : query IDENT '=' QueryKat        { ($2, "", $4) }
+      | Comms query IDENT '=' QueryKat  { ($3, $1, $5) }
 
+Comms : COMMENT                         { $1 }
+      | COMMENT Comms                   { $1 ++ "\n" ++ $2 }
+
+      
 QueryKat : '0'                          { QEmpty }
          | '_'                          { QAll }
          | '1'                          { QEpsilon }
@@ -133,6 +139,9 @@ QueryKat : '0'                          { QEmpty }
 
 {
 happyError = undefined
+
+commQuery :: String -> (String, Query) -> (String, Query)
+commQuery s (s', q) = (s ++ "\n" ++ s' , q)
 
 parse :: String -> Declarations
 parse = decls . alexScanTokens
