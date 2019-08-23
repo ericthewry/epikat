@@ -102,25 +102,23 @@ listFuse xs ys = mapMaybe (uncurry fuse) (xs +*+ ys)
 permute :: [a] -> [a]
 permute = id -- head . take 5 . permutations
 
-(+~+) x y = interleave [x,y]
-
 -- Compute the fixpoint of the set-lifted fuse operation
 lubG :: Integer -> [GuardedString] -> [GuardedString] -> [GuardedString]
 lubG 0 _ prev = prev
 lubG gas gStrings prev =
   permute prev
-  +~+
+  +++
   let next = (gStrings `listFuse` prev) in
     if next == prev then next else lubG (gas-1) gStrings next
 
 lubInf :: [GuardedString] -> [GuardedString] -> [GuardedString]
 lubInf gStrings prev =
-  permute prev +~+
+  permute prev +++
     let next = (gStrings `listFuse` prev) in
       if next == prev then next else lubInf gStrings next
   
 
-takeUnique :: Integer -> [GuardedString] -> [GuardedString]
+takeUnique :: Int -> [GuardedString] -> [GuardedString]
 takeUnique = takeUniqueAux []
   where takeUniqueAux seen i [] = []
         takeUniqueAux seen 0 _ = []
@@ -130,7 +128,7 @@ takeUnique = takeUniqueAux []
 
 
 fixpointGS :: [Atom] -> [GuardedString] -> [GuardedString]
-fixpointGS atoms gs = lubG 1000 gs $ map Single atoms
+fixpointGS atoms gs = lubG 10 gs $ map Single atoms
 
 
 -- Convert an atom to corresponding world `Pos` tests are true in the
@@ -152,7 +150,7 @@ allAtoms :: Set AtomicTest -> [Atom]
 allAtoms alphabet =
   Set.foldr (\ letter atoms ->
                 map (addPos letter) atoms
-                +~+ map (addNeg letter) atoms
+                ++ map (addNeg letter) atoms
                ) [Atom Set.empty Set.empty] alphabet
 
 -- Computes all atoms in which the test `t` evaluates to True
@@ -173,7 +171,7 @@ gs_interp atoms (KVar v) =
   [ Prog a v (Single b)  | a <- atoms, b <- atoms ]
 
 gs_interp atoms (KSeq p q) = gs_interp atoms p `listFuse` gs_interp atoms q
-gs_interp atoms (KUnion p q) = gs_interp atoms p +~+ gs_interp atoms q
+gs_interp atoms (KUnion p q) = gs_interp atoms p +++ gs_interp atoms q
 gs_interp atoms (KStar p) = fixpointGS atoms $ gs_interp atoms p
 
 

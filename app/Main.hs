@@ -7,6 +7,7 @@ import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 
 import Data.Char
+import Data.List
 
 import System.Environment (getArgs)
 
@@ -130,12 +131,21 @@ import Parser
 -- query =
 --   let Just a = lookupAction (actionsc ctx) "public_announce" in
 --     katFromAction a
+
+parseArgs :: [String] -> (String, Bool, Int, Bool)
+parseArgs [] = error "insufficient arguments!"
+parseArgs ("kat":f:_)  = (f, True, (-1), False)
+parseArgs ("gs":n:f:_) = (f, False, read n, False)
+parseArgs ("auto":n:f:_) = (f, False, read n, True)
+parseArgs (n:f:_) = (f, False, read n, False) -- If no command given, default to GS model
+parseArgs args = error ("Unrecognized arguments " ++ intercalate " " args)
   
   
 main :: IO ()
 main = do
   args <- getArgs
-  contents <- readFile $ head $ tail args
-  putStrLn $ if (map toLower $ head args) == "kat"
+  let (file, kat, num, auto) = parseArgs args
+  contents <- readFile file
+  putStrLn $ if kat
              then showKatTerms $ parse contents
-             else showQueryResults (read $ head args) $ parse contents
+             else showQueryResults num auto $ parse contents
