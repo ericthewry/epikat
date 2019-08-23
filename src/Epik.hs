@@ -173,6 +173,17 @@ lookupQ n [] = Nothing
 lookupQ n ((n', _, q):qs) = if n == n' then Just q
                             else lookupQ n qs
 
+
+queryOfKat :: Kat -> Query
+queryOfKat KZ = QEmpty
+queryOfKat KEps = QEpsilon
+queryOfKat (KBool t) = QTest t
+queryOfKat (KEvent a) = QIdent $ show a
+queryOfKat (KSequence k k') = binop queryOfKat QConcat k k'
+queryOfKat (KPlus k k') = binop queryOfKat QUnion k k'
+queryOfKat (KAnd k k') = binop queryOfKat QIntersect k k'
+queryOfKat (KIter k) = QStar $ queryOfKat k
+
 katOfQuery :: Context -> QueryData ->  Query -> [Kat]
 katOfQuery ctx scope QEmpty = [kzero]
 katOfQuery ctx scope QEpsilon = [kepsilon]
@@ -188,7 +199,7 @@ katOfQuery ctx scope (QApply (QIdent agent) q) =
     Just f  -> katOfQuery ctx scope $ liftQ f q
 katOfQuery ctx scope (QApply _ _) = error "function application must be with an agent"
 katOfQuery ctx scope (QConcat q q') =
-  [kseq k k' | k <- katOfQuery ctx scope q, k' <- katOfQuery ctx scope q ]
+  [kseq k k' | k <- katOfQuery ctx scope q, k' <- katOfQuery ctx scope q' ]
 katOfQuery ctx scope (QUnion q q') =
   [ kunion k k' | k <- katOfQuery ctx scope q, k' <- katOfQuery ctx scope q']
 katOfQuery ctx scope (QIntersect q q') =
@@ -209,7 +220,7 @@ katOfQuery ctx scope (QComplement q) =
     (QApply (QIdent agent)  q') ->
       case agent `lookup` viewsc ctx of
         Nothing -> error ("Could not find agent \"" ++ agent ++ "\"")
-        Just f  -> katOfQuery ctx scope $ QComplement $ liftQ f q'
+        Just f  -> concatMap ((katOfQuery ctx scope) . QComplement . queryOfKat) $ katOfQuery ctx scope $ liftQ f q'
     (QApply q _ ) -> error ("LHS of application must be agent, not " ++ show q)
     QUnion q q' -> katOfQuery ctx scope $
                    QIntersect (QComplement q) (QComplement q')
@@ -218,8 +229,8 @@ katOfQuery ctx scope (QComplement q) =
                     QUnion (QConcat q $ QComplement q') $
                     QConcat (QComplement q) (QComplement q')
 
-    QIntersect q q' -> katOfQuery ctx scope
-                       (QComplement q `QUnion` QComplement q')
+    QIntersect q q' -> katOfQuery ctx scope $
+                       QUnion (QComplement q) (QComplement q')
     QStar q -> [kzero]
 -- katOfQuery ctx scope (QComplement q) = negate ctx `concatMap` katOfQuery ctx scope q
 
