@@ -1,0 +1,118 @@
+Opening input file 'announce_peek.fst'
+Defined 'H': 664 bytes. 2 states, 1 arc, 1 path.
+Defined 'T': 664 bytes. 2 states, 1 arc, 1 path.
+Defined 'p': 688 bytes. 2 states, 2 arcs, 2 paths.
+Defined 'ppWf': 800 bytes. 4 states, 4 arcs, 2 paths.
+Defined 'ppIf': 800 bytes. 4 states, 4 arcs, 2 paths.
+Defined 'pp': 768 bytes. 3 states, 4 arcs, 4 paths.
+Defined 'ActH0': 712 bytes. 2 states, 3 arcs, 3 paths.
+Defined 'ActH': 824 bytes. 4 states, 5 arcs, 3 paths.
+Defined 'ActT0': 712 bytes. 2 states, 3 arcs, 3 paths.
+Defined 'ActT': 824 bytes. 4 states, 5 arcs, 3 paths.
+Defined 'Act': 1.0 Kb. 6 states, 10 arcs, 6 paths.
+Defined 'Act0': 800 bytes. 2 states, 6 arcs, 6 paths.
+defined Event(X).
+Defined 'Squash': 2.3 Kb. 2 states, 6 arcs, Circular.
+Defined 'Wf0': 840 bytes. 3 states, 7 arcs, Circular.
+defined Cn(X, Y).
+Defined 'Short0': 3.0 Kb. 4 states, 29 arcs, Circular.
+defined Short(X).
+defined Pl(X).
+defined Cnr(R, S).
+defined Plr(X).
+Defined 'Ra1': 688 bytes. 2 states, 2 arcs, 2 paths.
+Defined 'Ra2': 800 bytes. 2 states, 6 arcs, 6 paths.
+Defined 'Ra0': 848 bytes. 2 states, 8 arcs, 8 paths.
+Undefined network 'Ra1'.
+Undefined Ra1.
+Undefined network 'Ra2'.
+Undefined Ra2.
+Defined 'Rae': 1.3 Kb. 10 states, 16 arcs, 8 paths.
+Defined 'Ra': 1.3 Kb. 9 states, 16 arcs, Circular.
+Defined 'Rb1': 688 bytes. 2 states, 2 arcs, 2 paths.
+Defined 'Rb2': 800 bytes. 2 states, 6 arcs, 6 paths.
+Defined 'Rb0': 848 bytes. 2 states, 8 arcs, 8 paths.
+Defined 'Rbe': 1.3 Kb. 10 states, 16 arcs, 8 paths.
+Defined 'Rb': 1.3 Kb. 9 states, 16 arcs, Circular.
+Defined 'W': 992 bytes. 5 states, 10 arcs, Circular.
+defined World(X).
+defined Dia(R, X).
+defined Not(X).
+defined Box(R, X).
+Defined 'eventlong': 2.3 Kb. 2 states, 6 arcs, 6 paths.
+Defined 'worldlong': 2.4 Kb. 2 states, 8 arcs, Circular.
+defined Spell(X).
+defined Have(E).
+Defined 'Heads': 752 bytes. 2 states, 4 arcs, Circular.
+Defined 'Tails': 752 bytes. 2 states, 4 arcs, Circular.
+Closing file announce_peek.fst...
+variable print-space = ON
+-------------------------
+Worlds where the world public_announce_heads is a possibility for Alice.
+There is just one.
+regex Dia(Ra,World(a));
+World(a) wraps the Kleene element a with tests.
+2.3 Kb. 4 states, 3 arcs, 1 path.
+H public_announce_heads H
+-------------------------
+Worlds where the world public_announce_tails is a possibility for Alice.
+regex Dia(Ra,World(b));
+2.3 Kb. 4 states, 3 arcs, 1 path.
+T public_announce_tails T
+-------------------------
+Worlds where alice_peek_heads is a possibility for Alice.
+There is just one possibility, because there are no other actions
+that generate this option for alice.
+Spell(Dia(Ra,World(c)));
+2.3 Kb. 4 states, 3 arcs, 1 path.
+H alice_peek_heads H
+-------------------------
+Worlds where bobby_peek_heads is a possibility for Alice.
+It should be bobby_peek_heads + bobby_peek_tails.
+regex Spell(Dia(Ra,World(d)));
+2.4 Kb. 6 states, 6 arcs, 2 paths.
+T bobby_peek_tails T
+H bobby_peek_heads H
+-------------------------
+Box (universal) modality.
+Worlds where every alternative for alice is alice_peek_heads,
+i.e. alice_peek_heads is the sole alternative for alice.
+regex Spell(Box(Ra,World(c)));
+It should be alice_peek_heads.
+2.3 Kb. 4 states, 3 arcs, 1 path.
+H alice_peek_heads H
+-------------------------
+Worlds where every alternative for alice is bobby_peek_heads,
+i.e. bobby_peek_heads is the sole alternative for alice.
+This should be null. There is no way for alice to get this
+information in one step.
+regex Spell(Box(Ra,World(d)));
+It should be alice_peek_heads.
+80 bytes. 1 state, 0 arcs, 0 paths.
+-------------------------
+Worlds where some alternative for alice is (bobby_peek_heads ; public_announce_heads)
+The result is the unit set of the complement.
+The second event lets Alice figure out what happened in the first.
+2.4 Kb. 6 states, 5 arcs, 1 path.
+H bobby_peek_heads H public_announce_heads H
+Worlds where some alternative for alice is in (bobby_peek_heads ; public_announce_heads + public_announce_tails)
+happens.
+Or worlds that result for alice when something in (bobby_peek_heads ; public_announce_heads + public_announce_tails)
+happens.
+There are two results.
+2.7 Kb. 10 states, 10 arcs, 2 paths.
+T bobby_peek_tails T public_announce_tails T
+H bobby_peek_heads H public_announce_heads H
+Worlds where every alternative for alice is in (bobby_peek_heads ; public_announce_heads + public_announce_tails)
+happens.
+There are two results.
+2.7 Kb. 10 states, 10 arcs, 2 paths.
+T bobby_peek_tails T public_announce_tails T
+H bobby_peek_heads H public_announce_heads H
+Worlds where every alternative for alice is in (bobby_peek_heads ; _)
+happens.
+The two results have in the second slot ways for Amy to learn what happened in the first.
+2.4 Kb. 6 states, 6 arcs, 2 paths.
+H bobby_peek_heads H public_announce_heads H
+H bobby_peek_heads H alice_peek_heads H
+bye.
