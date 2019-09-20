@@ -55,18 +55,18 @@ query ab_peek = alice(bobby_peek_heads)
 
 -- Worlds where every alternative for alice is alice_peek_heads,
 -- i.e. alice_peek_heads is the sole alternative for alice.
-query a_box_a_peek = ~alice(~alice_peek_heads)
+query a_box_a_peek = _ & ~alice(~alice_peek_heads)
 
 -- Worlds where every alternative for alice is bobby_peek_heads,
 -- i.e. bobby_peek_heads is the sole alternative for alice.
 -- This should be null. There is no way for alice to get this
 -- information in one step.
-query a_box_a_peek = ~alice(~bobby_peek_heads)
+query a_box_a_peek = _ & ~alice(~bobby_peek_heads)
 
 -- Worlds where every alternative for alice is of the form  (bobby_peek_heads ; public_announce_heads)
 -- This lets Alice learn that it is heads in the second event.
 -- This does not work. Is it because the image vs pre-image logic is wrong?
-query a_box_a_peek_concat_pah1 = ~alice(~(bobby_peek_heads ; public_announce_heads))
+query a_box_a_peek_concat_pah1 = (_;_) &  ~alice(~(bobby_peek_heads ; public_announce_heads))
 
 -- Worlds where some alternative for alice is (bobby_peek_heads ; public_announce_heads)
 -- The result is the unit set of the complement.
@@ -79,7 +79,7 @@ query a_box_a_peek_concat_pah2 = alice((bobby_peek_heads ; public_announce_heads
 -- There are two results.
 --	((heads~tails)).bobby_peek_heads.((heads~tails)).public_announce_heads.((heads~tails))
 --	((~headstails)).bobby_peek_tails.((~headstails)).public_announce_tails.((~headstails))
-query a_box_a_peek_concat_pah3 = alice((bobby_peek_heads ; public_announce_heads + public_announce_tails))
+query a_box_a_peek_concat_pah3 = alice((bobby_peek_heads ; public_announce_heads) + public_announce_tails)
 
 
 

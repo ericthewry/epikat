@@ -90,7 +90,7 @@ ifElse cond tru fls = -- if (cond) { tru } else { fls } =^= cond ; tru + ~cond;f
 data Query = -- a relational alegebra for Queries
   QEmpty -- Uninhabited
   | QEpsilon -- the empty string
-  | QAll -- Inhabited by every string
+  | QAll -- Inhabited by every one-character string
   | QIdent String -- An Agent, View, or Previously-defined Query
   | QTest Test  -- check a test
   | QApply Query Query -- QApply f x is f(x)
@@ -118,7 +118,6 @@ instance Show Query  where
   show (QComplement q) = "~" ++ show q
   -- show (QSubtract q q') = show q ++ " \\ " show q'
   show (QStar q) = "(" ++ show q ++ ")*"
-
 
 type Agent = String
 type QueryName = String

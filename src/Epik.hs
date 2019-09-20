@@ -33,13 +33,13 @@ nameStr = show . name
 lookupAction :: AtomicProgram -> [Action] -> Maybe Action
 lookupAction p = find (\a -> name a == p)
 
-  
 data Context =
   Context { alphabetc :: Set AtomicTest
           , atomsc :: [Atom]
           , assertion :: Test
           , actionsc :: [Action]
-          , viewsc :: [(Agent, Map AtomicProgram [AtomicProgram])]}
+          , viewsc :: [(Agent, Map AtomicProgram [AtomicProgram])]
+          , queriesc :: QueryData}
 
 
 instance Show Context where
@@ -80,6 +80,8 @@ compileDecls (Program alphabet asserts actions views queries) =
           , assertion = assertion
           , actionsc = map (\(n, p) -> compileAction n p) actions
           , viewsc = views
+          , queriesc = queries
+          
           }
 
 scopeFor :: QueryData -> QueryName -> QueryData
@@ -94,7 +96,8 @@ atomicActions ctx = foldr (\x -> Set.insert (name x)) Set.empty (actionsc ctx)
 runQueries :: Declarations -> [(QueryName, String, [GuardedString])]
 runQueries decls =
   let context = compileDecls decls in
-  map (\(n, c, q) -> (n, c, computeGuardedStrings context (scopeFor (queries decls) n) q)) $
+  map (\(n, c, q) -> (n, c, gs_interpQ context q)) $
+--  map (\(n, c, q) -> (n, c,computeGuardedStrings context (scopeFor (queries decls) n) q)) $
   queries decls
 
 runQueriesAuto :: Declarations -> [(QueryName, String, [GuardedString])]
@@ -115,7 +118,8 @@ accShow sep x str = sep ++ show x ++ str
 
 showQueryResults :: Int -> Bool -> Declarations -> String
 showQueryResults num useStrings decls =
-  let queries = if useStrings then runQueries decls else runQueriesAuto decls in
+  -- let queries = if useStrings then runQueries decls else runQueriesAuto decls in
+  let queries = runQueries decls in
     foldr (\(name, comments, gsTraces) accStr ->
                 let gsStr = foldr (accShow "\n\t") "\n" (sortOn gsLen$ takeUnique num gsTraces)  in
                 let header = name ++ " identifies the following strings:" in
@@ -134,8 +138,6 @@ showKatTerms decls =
                 -- "\t" ++ show ukat ++ "\n\t+\n" ++
                 concatMap (\k -> "\t" ++ show k ++ "\n") aks ++ "\n") $
     map (\(n,c, q) -> ( n, c, desugar ctx (scopeFor (queries decls) n) q)) $ queries decls
-
-
 
 ----------------------------------------------------------------------------------
 ----------------------------------------------------------------------------------
@@ -168,6 +170,31 @@ liftQ alt (QIntersect q q') = liftQ alt q `QIntersect` liftQ alt q'
 liftQ alt (QComplement q) = QComplement $ liftQ alt q
 liftQ alt (QStar k) = QStar $ liftQ alt k
 
+liftGS :: Context -> Map AtomicProgram [AtomicProgram] -> GuardedString -> [GuardedString]
+liftGS ctx alt (Single atom) = [Single atom]
+liftGS ctx alt gs'@(Prog atom p gs) =
+  case (p `Map.lookup` alt) of
+    Nothing -> [gs']
+    Just alts ->
+      let katOfProg s = s `lookupAction` actionsc ctx in
+      let altA = mapMaybe katOfProg alts in
+      let altQ = map (queryOfKat . program) altA in        
+      let altGS = concatMap (gs_interpQ ctx) altQ in
+      -- error ((show [Single atom]) ++ " <> " ++ (show p) ++ " <> " ++ show (liftGS ctx alt gs) ++ " ==== " ++ show (
+                [Single atom] +<>+ altGS +<>+ liftGS ctx alt gs
+            -- ))
+
+invert :: Map AtomicProgram [AtomicProgram] -> Map AtomicProgram [AtomicProgram]
+invert =
+  Map.foldrWithKey'
+  (\k vs m' ->
+     foldr (\v -> Map.insertWith (++) v [k]) m' vs
+  ) Map.empty  
+
+liftGSPre :: Context -> Map AtomicProgram [AtomicProgram] -> GuardedString -> [GuardedString]
+liftGSPre ctx alt = liftGS ctx (invert alt)
+
+
 lookupQ :: String -> QueryData -> Maybe Query
 lookupQ n [] = Nothing
 lookupQ n ((n', _, q):qs) = if n == n' then Just q
@@ -177,7 +204,7 @@ lookupQ n ((n', _, q):qs) = if n == n' then Just q
 queryOfKat :: Kat -> Query
 queryOfKat KZ = QEmpty
 queryOfKat KEps = QEpsilon
-queryOfKat (KBool t) = QTest t
+queryOfKat (KBool t) =  QTest t
 queryOfKat (KEvent a) = QIdent $ show a
 queryOfKat (KSequence k k') = binop queryOfKat QConcat k k'
 queryOfKat (KPlus k k') = binop queryOfKat QUnion k k'
@@ -196,7 +223,7 @@ katOfQuery ctx scope (QTest t) = [ktest t]
 katOfQuery ctx scope (QApply (QIdent agent) q) =
   case agent `lookup` viewsc ctx of
     Nothing -> error ("Could not find agent \"" ++ agent ++ "\"")
-    Just f  -> katOfQuery ctx scope $ liftQ f q
+    Just f  -> lift f `map` katOfQuery ctx scope q
 katOfQuery ctx scope (QApply _ _) = error "function application must be with an agent"
 katOfQuery ctx scope (QConcat q q') =
   [kseq k k' | k <- katOfQuery ctx scope q, k' <- katOfQuery ctx scope q' ]
@@ -207,6 +234,7 @@ katOfQuery ctx scope (QIntersect q q') =
 katOfQuery ctx scope (QStar q) =
   [ kstar k | k <- katOfQuery ctx scope q ]
 katOfQuery ctx scope (QComplement q) =
+--  concatMap (\k -> map (kunion k) (katOfQuery ctx scope $ QConcat q $ QConcat QAll $ QStar QAll)) $
   case q of
     QAll -> [kzero]
     QEpsilon ->  [kzero]
@@ -220,7 +248,7 @@ katOfQuery ctx scope (QComplement q) =
     (QApply (QIdent agent)  q') ->
       case agent `lookup` viewsc ctx of
         Nothing -> error ("Could not find agent \"" ++ agent ++ "\"")
-        Just f  -> concatMap ((katOfQuery ctx scope) . QComplement . queryOfKat) $ katOfQuery ctx scope $ liftQ f q'
+        Just f  -> concatMap ((katOfQuery ctx scope) . QComplement . queryOfKat . (lift f)) $ katOfQuery ctx scope q'
     (QApply q _ ) -> error ("LHS of application must be agent, not " ++ show q)
     QUnion q q' -> katOfQuery ctx scope $
                    QIntersect (QComplement q) (QComplement q')
@@ -232,19 +260,6 @@ katOfQuery ctx scope (QComplement q) =
     QIntersect q q' -> katOfQuery ctx scope $
                        QUnion (QComplement q) (QComplement q')
     QStar q -> [kzero]
--- katOfQuery ctx scope (QComplement q) = negate ctx `concatMap` katOfQuery ctx scope q
-
--- negate :: Context -> Kat -> [Kat] 
--- negate ctx KZero = [Set.fold (KUnion . KVar) KZero $ atomicActions ctx]
--- negate ctx KEpsilon = [KZero]
--- negate ctx (KVar a) = [Set.fold (KUnion . KVar) KZero $
---                        Set.delete a $ atomicActions ctx]
--- negate ctx (KTest t) = [KTest $ TNeg t]
--- negate ctx (KSeq k k') =
---   let neg nk nk' = KSeq nk k' `KUnion` KSeq k nk' in
---   concatMap (\nk -> (map (neg nk) (negate ctx k'))) $ negate ctx k
--- negate ctx (KUnion k k') = negate ctx k ++ negate ctx k'
--- negate ctx (KStar _ ) = [KZero]
 
 mkAutoL' :: Context -> Kat -> Auto [State Atom Kat]
 mkAutoL' ctx = mkAutoL (atomsc ctx) (Set.toList $ atomicActions ctx)
@@ -255,21 +270,6 @@ compile ctx scope query =
   foldr1 intersectAutoL $
   mkAutoL' ctx `map`
   desugar ctx scope query
-
--- divideUnions :: Kat -> [Kat]
--- divideUnions (KUnion k KZero) = divideUnions k
--- divideUnions (KUnion KZero k') = divideUnions k'
--- divideUnions (KUnion k k') = divideUnions k ++ divideUnions k'
--- divideUnions k = [k]
-
--- restoreUnions :: Set Kat -> Kat
--- restoreUnions = Set.fold (KUnion) KZero
-
--- factorUnions :: [Set Kat] -> (Set Kat, [[Kat]])
--- factorUnions ks =
---   let commonUnions = foldr1 Set.intersection ks in
---   let remainder = map (\us -> Set.toList (us `Set.difference` commonUnions)) ks in
---   (commonUnions, remainder)
 
 fstApply :: (a -> b) -> (a,c) -> (b, c)
 fstApply f (x, y) = (f x, y)
@@ -350,4 +350,37 @@ substActions actions (KAnd k k') =
 substActions actions (KIter k) =
   kstar $ substActions actions k
 
+gs_interpQ :: Context -> Query -> [GuardedString]
+gs_interpQ ctx QEmpty = []
+gs_interpQ ctx QEpsilon = [(Single a) | a <- atomsc ctx]
+gs_interpQ ctx QAll = concatMap ((gs_interpQ ctx) . queryOfKat . program) $ actionsc ctx
+gs_interpQ ctx (QTest t) =
+  [(Single a) | a <- atomsc ctx, eval (atomToWorld a) t]
+gs_interpQ ctx (QIdent s) =
+  case AtomicProgram s `lookupAction` actionsc ctx of
+    Just x -> gs_interp (atomsc ctx) $ program x
+    Nothing -> case s `lookupQ` queriesc ctx of
+                 Just q -> gs_interpQ ctx q
+                 Nothing -> error ("USEBEFOREDEF " ++ s)
 
+gs_interpQ ctx q'@(QApply (QIdent s) q) =
+  case s `lookup` viewsc ctx of
+    Just f -> liftGS ctx f `concatMap` gs_interpQ ctx q
+      -- error ( s ++ "(" ++ (show q) ++ ") == "
+      --        ++ show (take 20 $ liftGS ctx f `concatMap` gs_interpQ ctx q))
+    Nothing -> error ("LHS of apply must be agent, could not find agent called" ++ s)
+
+gs_interpQ ctx (QApply _ _ ) = error ("LHS of apply must be agent, not query")
+
+gs_interpQ ctx (QConcat q q') = gs_interpQ ctx q `listFuse` gs_interpQ ctx q'
+gs_interpQ ctx (QUnion q q') = gs_interpQ ctx q +++ gs_interpQ ctx q'
+gs_interpQ ctx (QIntersect q q') =
+  interPairList (gs_interpQ ctx q +*+ gs_interpQ ctx q')
+gs_interpQ ctx (QComplement q) =
+  gs_interpQ ctx (QAll `QConcat` QStar QAll) +-+ gs_interpQ ctx q
+gs_interpQ ctx (QStar q) = fixpointGS (atomsc ctx) $ gs_interpQ ctx q
+
+interPairList :: Eq a => [(a,a)] -> [a]
+interPairList [] = []
+interPairList ((a,a'):as) | a == a' = a : interPairList as
+                          | otherwise = interPairList as

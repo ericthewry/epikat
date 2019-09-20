@@ -27,41 +27,25 @@ agent bobby =
   (bobby_peek_heads -> bobby_peek_heads)
   (bobby_peek_tails -> bobby_peek_tails)
 
-query OneEvent = _
-query OneEventHeads = _; test heads
-query OneEventTails = _; test tails
 
-query TwoEventsHeads = _; _; test heads
-query TwoEventsTails = _; _; test tails
+query not_not_bph_pah = ~(bobby_peek_heads; public_announce_heads)
 
-query HeadsTwoEventsTails = test heads; _; _; test tails
 
-query Union1 = 
-     public_announce_heads + public_announce_tails
+-- What is knowledge?  A knowledge query K(a, X) should be the sequences
+-- that a knows in all worlds described by guarded strings X. 
+-- an alternative relation R(a) in Event x Event is defined to be
+--    Ra = { (e, e') | whenever e occurs, e' is a possibility for a  }
+query box_not_bph_pah = alice(~(bobby_peek_heads;public_announce_heads))
 
-query ConcatenationUnion1 = 
-     (bobby_peek_heads + bobby_peek_tails) ; (alice_peek_heads + alice_peek_tails)
+query box_not_bph_pah_lit = ~alice(~(bobby_peek_heads;public_announce_heads))
 
-query ConcatenationUnion2 = 
-     (bobby_peek_heads + bobby_peek_tails) ; (alice_peek_heads + alice_peek_tails) ; (public_announce_heads + public_announce_tails)
+query neg__box_not_bph_pah_lit = ~(box_not_bph_pah_lit)
 
-query IntersectionUnion1 = 
-     (bobby_peek_heads + bobby_peek_tails) & (bobby_peek_heads + alice_peek_heads)
 
-query Heads = (_*) ; (test heads)
-query Tails = (_*) ; (test tails)
-
--- negates the Heads query
-query NotHeads = ~Heads #an erased comment
--- written as ~Tails
-query NotTails = ~Tails #look a comment (it won't show up)
-
- # this comment can occur anywhere and isnt' kept
--- Here's a comment About NotHeadsThree
--- And another continuation of the same comment
--- They will be attached to the query in the output
-query NotHeadsThree = NotHeads & (_;_;_)
-
+#-- World where every alternative for alice is of the form (bobby_peek_heads; public_announc#e_heads)
+#-- This lets Alice learn that it is heads in the second event
+#-- This does not work
+#query abox_bph_pah = ~alice(~(bobby_peek_heads; public_announce_heads))
 
 
 

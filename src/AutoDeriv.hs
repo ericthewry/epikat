@@ -14,7 +14,7 @@ import qualified Data.Either as Either
 
 import Syntax
 import BDD
-import GuardedStrings hiding (atomToWorld)
+import GuardedStrings
 
 -- A transition can occur when the Test succeeds or when the
 -- AtomicProgram is at the tape head
@@ -70,9 +70,6 @@ setSeq ps qs = Set.fold (\q rst -> Set.map (\p -> kseq p q) ps `Set.union` rst) 
 
 binop :: (a -> b) -> (b -> b -> b) -> a -> a -> b
 binop f op x y = f x `op` f y
-
-atomToWorld :: Atom -> World
-atomToWorld = World . posa
 
 nullable :: Atom -> Kat -> Bool
 nullable atom KZ = False

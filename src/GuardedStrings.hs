@@ -46,8 +46,10 @@ data GuardedString =
   deriving (Eq,Ord)
 
 instance Show GuardedString where
-  show (Single atom) = "(" ++ show atom ++ ")"
-  show (Prog atom prog gs) = "(" ++ show atom ++ ")." ++ show prog ++ "." ++ show gs
+  show (Single atom) = "" -- show atom
+  show (Prog atom prog gs) =
+    -- show atom ++ "." ++ show prog ++ "." ++ show gs
+    show prog ++ "." ++ show gs
 
 -- get the first atom of a guarded string
 first :: GuardedString -> Atom
@@ -97,6 +99,27 @@ listFuse :: [GuardedString] -> [GuardedString] -> [GuardedString]
 -- listFuse xs ys =
 --   foldr (\x rst -> fuseCoset x ys ++ rst) [] xs
 listFuse xs ys = mapMaybe (uncurry fuse) (xs +*+ ys)
+xs +<>+ ys = xs `listFuse` ys
+
+elemApprox :: GuardedString -> [GuardedString] -> Bool
+elemApprox g = elemLeqLen (100*gsLen g) g
+
+elemLeqLen :: Integer -> GuardedString -> [GuardedString] -> Bool
+elemLeqLen _ _ [] = False
+elemLeqLen n g (g':gs) =
+  if n <= 0 then False else
+  if g == g' then True else
+  if gsLen g < gsLen g' then elemLeqLen (n-1) g gs
+  else elemLeqLen n g gs
+  
+
+
+-- Lazy Approximate subtraction
+(+-+) ::[GuardedString] -> [GuardedString] -> [GuardedString]
+(+-+) xs [] = xs
+(+-+) [] _ = []
+(+-+) (x:xs) ys | elemApprox x ys = xs +-+ ys
+                | otherwise = x : (xs +-+ ys)
 
 
 permute :: [a] -> [a]
@@ -128,7 +151,7 @@ takeUnique = takeUniqueAux []
 
 
 fixpointGS :: [Atom] -> [GuardedString] -> [GuardedString]
-fixpointGS atoms gs = lubG 10 gs $ map Single atoms
+fixpointGS atoms gs = lubG 6 gs $ map Single atoms
 
 
 -- Convert an atom to corresponding world `Pos` tests are true in the
@@ -177,6 +200,6 @@ gs_interp atoms (KIter p) = fixpointGS atoms $ gs_interp atoms p
 
 
 
-gsLen :: GuardedString -> Int
+gsLen :: GuardedString -> Integer
 gsLen (Single _) = 0
 gsLen (Prog _ _ gs) = 1 + gsLen gs
