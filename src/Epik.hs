@@ -181,7 +181,8 @@ liftGS ctx alt gs'@(Prog atom p gs) =
       let altQ = map (queryOfKat . program) altA in        
       let altGS = concatMap (gs_interpQ ctx) altQ in
       -- error ((show [Single atom]) ++ " <> " ++ (show p) ++ " <> " ++ show (liftGS ctx alt gs) ++ " ==== " ++ show (
-                [Single atom] +<>+ altGS +<>+ liftGS ctx alt gs
+        if gsLen gs == 0 then altGS else 
+          altGS +<>+ liftGS ctx alt gs
             -- ))
 
 invert :: Map AtomicProgram [AtomicProgram] -> Map AtomicProgram [AtomicProgram]
@@ -365,7 +366,7 @@ gs_interpQ ctx (QIdent s) =
 
 gs_interpQ ctx q'@(QApply (QIdent s) q) =
   case s `lookup` viewsc ctx of
-    Just f -> liftGS ctx f `concatMap` gs_interpQ ctx q
+    Just f -> liftGSPre ctx f `concatMap` gs_interpQ ctx q
       -- error ( s ++ "(" ++ (show q) ++ ") == "
       --        ++ show (take 20 $ liftGS ctx f `concatMap` gs_interpQ ctx q))
     Nothing -> error ("LHS of apply must be agent, could not find agent called" ++ s)
