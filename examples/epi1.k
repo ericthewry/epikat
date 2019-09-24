@@ -50,7 +50,7 @@ query aa_peek = aly(aly_peek_H)
 -- 4. Worlds where bob_peek_H is a possibility for Aly.
 -- It should be bob_peek_H + bob_peek_T.
 -- aly(bob_peek_H)
--- BAD we get just bob_peek_H.
+-- GOOD we get those two worlds.
 query ab_peek = aly(bob_peek_H)
 
 
@@ -59,7 +59,9 @@ query ab_peek = aly(bob_peek_H)
 -- i.e. aly_peek_H is the sole alternative for aly.
 -- It should be the unit set of aly_peek_H.
 -- _ & ~aly(~aly_peek_H)
--- GOOD but why is the intersection with _ needed?
+-- GOOD
+-- The top-level intersection with _ needed because currently the implementation approximates
+--  the set. This should be fixed with when an automaton construction is implemented.
 query a_box_a_peek = _ & ~aly(~aly_peek_H)
 
 -- 4b. The same thing for announce_H.
@@ -72,7 +74,8 @@ query a_box_a_peek = _ & ~aly(~announce_H)
 -- i.e. aly_peek_H is the sole alternative for aly.
 -- It should be the unit set of aly_peek_H.
 -- ~aly(~aly_peek_H)
--- WITHOUT THE INTERSECTION we get longer worlds, this looks wrong semantically.
+-- FOR FUTURE REFERENCE
+-- Without the intersection we get longer worlds, which looks wrong semantically.
 query a_box_a_peek = ~aly(~aly_peek_H)
 
 -- 6. Worlds where every alternative for aly is bob_peek_H,
@@ -80,21 +83,18 @@ query a_box_a_peek = ~aly(~aly_peek_H)
 -- This should be null. There is no way for aly to get this
 -- information in one step.
 -- _ & ~aly(~bob_peek_H)
--- BAD we get the unit set of bob_peek_H).
+-- GOOD
 query a_box_a_peek = _ & ~aly(~bob_peek_H)
 
 -- 7. Worlds where every alternative for aly is of the form  (bob_peek_H.announce_H)
 -- This lets Aly learn that it is H in the second event.
 -- The result should be the unit set of bob_peek_H.announce_H.
 -- (_;_) &  ~aly(~(bob_peek_H ; announce_H))
--- GOOD but why do we need the intersection?
+-- GOOD (note that there 
 query a_box_a_peek_concat_pah1 = (_;_) &  ~aly(~(bob_peek_H ; announce_H))
 
--- 8. Iterated knowledge
--- _ & ~aly(~announce_H)
--- It should be the unit set.
--- GOOD
-query aly_know_know_announce_H = _ & ~aly(~announce_H)
+-- 8. Worlds of length two where it is tails
+query two_tails = (_;_) 
 
 
 
