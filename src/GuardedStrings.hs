@@ -182,7 +182,7 @@ inducedAtoms t = filter (\ a -> evalAtom a t)
 
 -- Interprets a `Kat` expression in a given alphabet, producing its corresponding set of guarded strings
 -- [| p |]^X subset of GuardedString
-gs_interp :: [Atom] -> Kat -> [GuardedString]
+gs_interp :: [Atom] -> Kat AtomicProgram -> [GuardedString]
 gs_interp atoms KZ = []
 gs_interp atoms KEps =
   [(Single a) | a <- atoms]

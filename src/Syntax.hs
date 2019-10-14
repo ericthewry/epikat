@@ -15,22 +15,23 @@ instance Show AtomicProgram where
 instance Show AtomicTest where
   show (AtomicTest s) = s
 
-data Kat =
+data Kat p =
   KZ -- End :: Kat
   | KEps -- Nop :: Kat
   | KBool Test -- KTest :: Test -> Kat
-  | KEvent AtomicProgram -- KVar :: AtomicProgram -> Kat
-  | KSequence Kat Kat       -- KSeq :: Kat -> Kat -> Kat  
-  | KPlus Kat Kat     -- KUnion :: Kat -> Kat -> Kat
-  | KAnd Kat Kat 
-  | KIter Kat          -- KStar :: Kat -> Kat
+  | KEvent p -- KVar :: AtomicProgram -> Kat
+  | KSequence (Kat p) (Kat p)       -- KSeq :: Kat -> Kat -> Kat  
+  | KPlus (Kat p) (Kat p)     -- KUnion :: Kat -> Kat -> Kat
+  | KApply (Map p [p]) (Kat p)
+  | KAnd (Kat p) (Kat p)
+  | KIter (Kat p)          -- KStar :: Kat -> Kat
   deriving (Eq, Ord)
 
-instance Show Kat where
+instance Show a => Show (Kat a) where
   show KZ = "0"
   show KEps = "1"
   show (KBool t) = "(" ++ show t ++ ")"
-  show (KEvent s) = show s
+  show (KEvent a) = show a
   show (KSequence p q) = show p ++ ";" ++ show q
   show (KPlus p q) = "(" ++ show p ++ " + " ++ show q ++ ")"
   show (KAnd p q) = "(" ++ show p ++ " & " ++ show q ++ ")"
@@ -82,7 +83,7 @@ instance Show Test where
   show (TNeg x) = "~" ++ show x
 
 
-ifElse :: Test -> Kat -> Kat -> Kat
+ifElse :: Test -> Kat p -> Kat p -> Kat p
 ifElse cond tru fls = -- if (cond) { tru } else { fls } =^= cond ; tru + ~cond;fls
   (ktest cond `kseq` tru)
   `kunion` (ktest (TNeg cond) `kseq` fls)
@@ -128,7 +129,7 @@ type QueryData = [NamedQuery]
 data Declarations =
   Program { alphabet :: Set AtomicTest        -- the alphabet of world-states
           , assertions :: [Test] -- conditions that specify consistent worlds
-          , actions :: [(AtomicProgram, Kat)] -- the world actions and their relations
+          , actions :: [(AtomicProgram, Kat AtomicProgram)] -- the world actions and their relations
           , views :: [(Agent, Map AtomicProgram [AtomicProgram])] -- alternative relations
           , queries :: QueryData -- queries expressed in KAT
           } deriving (Eq,Show)

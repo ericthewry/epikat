@@ -71,7 +71,7 @@ setSeq ps qs = Set.fold (\q rst -> Set.map (\p -> kseq p q) ps `Set.union` rst) 
 binop :: (a -> b) -> (b -> b -> b) -> a -> a -> b
 binop f op x y = f x `op` f y
 
-nullable :: Atom -> Kat -> Bool
+nullable :: Atom -> (Kat p) -> Bool
 nullable atom KZ = False
 nullable atom KEps = True
 nullable atom (KEvent _) = False
@@ -81,11 +81,19 @@ nullable atom (KSequence k k') = binop (nullable atom) (&&) k k'
 nullable atom (KAnd k k') = binop (nullable atom) (&&) k k'
 nullable atom (KIter k) = True
 
-accepting :: State Atom Kat -> Bool
+accepting :: State Atom (Kat p) -> Bool
 accepting (AtExp (at, expr)) = nullable at expr
 accepting (Exp _) = False
 
-deriv :: AtomicProgram -> (Atom, Kat) -> Set Kat
+
+accepts :: GuardedString -> Kat AtomicProgram -> Bool
+accepts (Single at) k = nullable at k
+accepts (Prog at prim gstr) k =
+  any id [ accepts gstr k' | k' <- Set.toList $ deriv prim (at,k)]
+
+
+-- INVARIANT act;atom is not contradictory. 
+deriv :: Ord p => p -> (Atom, Kat p) -> Set (Kat p)
 deriv act (atom, KZ) = Set.empty
 deriv act (atom, KEps) = Set.empty
 deriv act (atom, KEvent act') | act == act' = Set.singleton kepsilon 
@@ -100,20 +108,27 @@ deriv act (atom, KSequence k k') =
   `Set.union`
   Set.fromList [k'' `kseq` k' | k'' <- Set.toList $ deriv act (atom, k)]
 
+deriv act (atom, KApply f k) =
+  case Map.lookup act f of
+    Nothing -> Set.singleton kzero
+    Just alts ->
+      Set.fromList [ KApply f k' | alt <- alts
+                                 , k' <- Set.toList $ deriv alt (atom, k)]
+
 deriv act (atom, ks@(KIter k)) =
   Set.fromList [k' `kseq` ks | k' <- Set.toList $ deriv act (atom, k) ]
 
-derivE :: Atom -> Kat -> Set (State Atom Kat)
+derivE :: Atom -> Kat p -> Set (State Atom (Kat p))
 derivE atom k = Set.singleton $ AtExp (atom , k)
 
-mkAuto :: [Atom] -> [AtomicProgram] -> Kat -> Auto (State Atom Kat)
+mkAuto :: [Atom] -> [AtomicProgram] -> Kat AtomicProgram -> Auto (State Atom (Kat AtomicProgram))
 mkAuto atoms programs k =
   let delta = transitions atoms programs [Exp k] Map.empty in
   Auto { start = Exp k
        , delta = delta
        , final = Set.filter accepting (Set.fromList $ states delta)   }
 
-mkAutoL :: [Atom] -> [AtomicProgram] -> Kat -> Auto [State Atom Kat]
+mkAutoL :: [Atom] -> [AtomicProgram] -> Kat AtomicProgram -> Auto [State Atom (Kat AtomicProgram)]
 mkAutoL atoms programs k =
   let auto = mkAuto atoms programs k in
     Auto { start = [start auto]
@@ -123,13 +138,13 @@ mkAutoL atoms programs k =
          , final = Set.map (\x -> [x]) (final auto) }
 
 
-nextHopsA :: Kat -> [Atom] -> [(Cond, State Atom Kat)]
+nextHopsA :: (Kat p) -> [Atom] -> [(Cond, State Atom (Kat p))]
 nextHopsA k  = concatMap (\atom ->
                              Set.foldr' (\st -> (:) (CAtom atom, st)) [] $
                              derivE atom k)
 
 
-nextHopsP :: Kat -> Atom -> [AtomicProgram] -> [(Cond, State Atom Kat)]
+nextHopsP :: Kat AtomicProgram -> Atom -> [AtomicProgram] -> [(Cond, State Atom (Kat AtomicProgram))]
 nextHopsP k atom = concatMap (\act ->
                                  Set.foldr' (\k -> (:) (CProg act, Exp k)) []
                                  $ deriv act (atom,k))
@@ -137,7 +152,7 @@ nextHopsP k atom = concatMap (\act ->
                  
 
 -- transitions k worklist agg produces the transition function for an automaton
-transitions :: [Atom] -> [AtomicProgram] -> [State Atom Kat] -> Delta (State Atom Kat) Cond  -> Delta (State Atom Kat) Cond
+transitions :: [Atom] -> [AtomicProgram] -> [State Atom (Kat AtomicProgram)] -> Delta (State Atom (Kat AtomicProgram)) Cond  -> Delta (State Atom (Kat AtomicProgram)) Cond
 transitions _ _ [] m = m
 transitions atoms progs (st@(Exp k) : worklist) m = -- \Delta_a : Expr -> Set (AtExp)
   addAllEdges atoms progs worklist m st $ 

@@ -24,7 +24,7 @@ import AutoDeriv
 {- END INTERNAL MODULES -}
   
 data Action = Action { name :: AtomicProgram
-                     , program :: Kat
+                     , program :: Kat AtomicProgram
                      } deriving (Eq, Show)
 
 nameStr :: Action -> String
@@ -50,7 +50,7 @@ instance Show Context where
 
 
 
-compileAction :: AtomicProgram -> Kat -> Action
+compileAction :: AtomicProgram -> Kat AtomicProgram -> Action
 compileAction name k =
   Action { name = name, program = subst (AtomicProgram "id") name k }
 
@@ -144,7 +144,7 @@ showKatTerms decls =
 ----------------------------------------------------------------------------------
 ----------------------------------------------------------------------------------
 
-lift :: Map AtomicProgram [AtomicProgram] -> Kat -> Kat
+lift :: Ord p => Map p [p] -> Kat p -> Kat p
 lift alt KZ = kzero             
 lift alt KEps = kepsilon
 lift alt (KBool t) = ktest t
@@ -202,7 +202,7 @@ lookupQ n ((n', _, q):qs) = if n == n' then Just q
                             else lookupQ n qs
 
 
-queryOfKat :: Kat -> Query
+queryOfKat :: Show p => Kat p -> Query
 queryOfKat KZ = QEmpty
 queryOfKat KEps = QEpsilon
 queryOfKat (KBool t) =  QTest t
@@ -212,7 +212,7 @@ queryOfKat (KPlus k k') = binop queryOfKat QUnion k k'
 queryOfKat (KAnd k k') = binop queryOfKat QIntersect k k'
 queryOfKat (KIter k) = QStar $ queryOfKat k
 
-katOfQuery :: Context -> QueryData ->  Query -> [Kat]
+katOfQuery :: Context -> QueryData ->  Query -> [Kat AtomicProgram]
 katOfQuery ctx scope QEmpty = [kzero]
 katOfQuery ctx scope QEpsilon = [kepsilon]
 katOfQuery ctx scope QAll = [Set.foldr (kunion . kvar) kzero $ atomicActions ctx]
@@ -224,7 +224,8 @@ katOfQuery ctx scope (QTest t) = [ktest t]
 katOfQuery ctx scope (QApply (QIdent agent) q) =
   case agent `lookup` viewsc ctx of
     Nothing -> error ("Could not find agent \"" ++ agent ++ "\"")
-    Just f  -> lift f `map` katOfQuery ctx scope q
+    Just f  -> [ kapply (lift f) k | k <- katOfQuery ctx scope q ]
+               -- lift f `map` katOfQuery ctx scope q
 katOfQuery ctx scope (QApply _ _) = error "function application must be with an agent"
 katOfQuery ctx scope (QConcat q q') =
   [kseq k k' | k <- katOfQuery ctx scope q, k' <- katOfQuery ctx scope q' ]
@@ -235,38 +236,40 @@ katOfQuery ctx scope (QIntersect q q') =
 katOfQuery ctx scope (QStar q) =
   [ kstar k | k <- katOfQuery ctx scope q ]
 katOfQuery ctx scope (QComplement q) =
+  [ kneg k | k <- katOfQuery ctx scope q]
+  
 --  concatMap (\k -> map (kunion k) (katOfQuery ctx scope $ QConcat q $ QConcat QAll $ QStar QAll)) $
-  case q of
-    QAll -> [kzero]
-    QEpsilon ->  [kzero]
-    QEmpty -> [kepsilon]
-    QComplement q -> katOfQuery ctx scope q
-    QTest t -> [ktest $ TNeg t]
-    QIdent s -> case s `lookupQ` scope  of
-                  Just q  -> katOfQuery ctx scope q
-                  Nothing -> [Set.fold (kunion . kvar) kzero $
-                              Set.delete (AtomicProgram s) $ atomicActions ctx]
-    (QApply (QIdent agent)  q') ->
-      case agent `lookup` viewsc ctx of
-        Nothing -> error ("Could not find agent \"" ++ agent ++ "\"")
-        Just f  -> concatMap ((katOfQuery ctx scope) . QComplement . queryOfKat . (lift f)) $ katOfQuery ctx scope q'
-    (QApply q _ ) -> error ("LHS of application must be agent, not " ++ show q)
-    QUnion q q' -> katOfQuery ctx scope $
-                   QIntersect (QComplement q) (QComplement q')
-    QConcat q q' -> katOfQuery ctx scope $
-                    QUnion (QConcat (QComplement q) q') $
-                    QUnion (QConcat q $ QComplement q') $
-                    QConcat (QComplement q) (QComplement q')
+  -- case q of
+  --   QAll -> [kzero]
+  --   QEpsilon ->  [kzero]
+  --   QEmpty -> [kepsilon]
+  --   QComplement q -> katOfQuery ctx scope q
+  --   QTest t -> [ktest $ TNeg t]
+  --   QIdent s -> case s `lookupQ` scope  of
+  --                 Just q  -> katOfQuery ctx scope q
+  --                 Nothing -> [Set.fold (kunion . kvar) kzero $
+  --                             Set.delete (AtomicProgram s) $ atomicActions ctx]
+  --   (QApply (QIdent agent)  q') ->
+  --     case agent `lookup` viewsc ctx of
+  --       Nothing -> error ("Could not find agent \"" ++ agent ++ "\"")
+  --       Just f  -> concatMap ((katOfQuery ctx scope) . QComplement . queryOfKat . (lift f)) $ katOfQuery ctx scope q'
+  --   (QApply q _ ) -> error ("LHS of application must be agent, not " ++ show q)
+  --   QUnion q q' -> katOfQuery ctx scope $
+  --                  QIntersect (QComplement q) (QComplement q')
+  --   QConcat q q' -> katOfQuery ctx scope $
+  --                   QUnion (QConcat (QComplement q) q') $
+  --                   QUnion (QConcat q $ QComplement q') $
+  --                   QConcat (QComplement q) (QComplement q')
 
-    QIntersect q q' -> katOfQuery ctx scope $
-                       QUnion (QComplement q) (QComplement q')
-    QStar q -> [kzero]
+  --   QIntersect q q' -> katOfQuery ctx scope $
+  --                      QUnion (QComplement q) (QComplement q')
+  --   QStar q -> [kzero]
 
-mkAutoL' :: Context -> Kat -> Auto [State Atom Kat]
+mkAutoL' :: Context -> Kat AtomicProgram -> Auto [State Atom (Kat AtomicProgram)]
 mkAutoL' ctx = mkAutoL (atomsc ctx) (Set.toList $ atomicActions ctx)
 
 
-compile :: Context -> QueryData -> Query -> Auto [State Atom Kat]
+compile :: Context -> QueryData -> Query -> Auto [State Atom (Kat AtomicProgram)]
 compile ctx scope query =
   foldr1 intersectAutoL $
   mkAutoL' ctx `map`
@@ -275,7 +278,7 @@ compile ctx scope query =
 fstApply :: (a -> b) -> (a,c) -> (b, c)
 fstApply f (x, y) = (f x, y)
   
-desugar :: Context -> QueryData -> Query -> [Kat]
+desugar :: Context -> QueryData -> Query -> [Kat AtomicProgram]
 desugar ctx scope query =
   -- factorUnions $
   -- map divideUnions $ -- [Set Kat]
@@ -305,7 +308,7 @@ intersectLazy' = (mapMaybe headMaybe) . foldr ((mapMaybe (allEqual' . uncurry (:
   where headMaybe [] = Nothing
         headMaybe (x:_) = Just x
 
-unroll :: Int -> Kat -> Kat
+unroll :: Int -> Kat p -> Kat p
 unroll 0 k = k
 unroll _ KZ = kzero
 unroll _ KEps = kepsilon
@@ -327,11 +330,11 @@ computeGuardedStrings ctx scope query =
    map (denote . (unroll 6)) kats)
 
 
-injectProg :: AtomicProgram -> (Atom, Atom) -> Kat
+injectProg :: AtomicProgram -> (Atom, Atom) -> Kat AtomicProgram
 injectProg a (pre, post) =
   ktest (testOfAtom pre) `kseq` kvar a `kseq` ktest (testOfAtom post)
 
-substActions :: [Action] -> Kat -> Kat
+substActions :: [Action] -> Kat AtomicProgram -> Kat AtomicProgram
 substActions actions KZ = kzero
 substActions actions KEps = kepsilon
 substActions actions (KBool t) =  ktest t
