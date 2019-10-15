@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 5dd083e6d80ebc6a1702cf699d48647ba901d52ed8ed5d8d505f372ec04bdc4c
+-- hash: 7ea7e9dd10450bf53bdf01a8e019340d8ff7cdfad5ed5c32b98816c2900efa9f
 
 name:           epik
 version:        0.1.0.0
@@ -32,7 +32,6 @@ library
       Epik
       GuardedStrings
       Lexer
-      NormalForms
       Parser
       Syntax
   other-modules:

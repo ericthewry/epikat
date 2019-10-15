@@ -63,6 +63,9 @@ kunion k KZ = k
 kunion (KBool t) (KBool t') = ktest (t `TOr` t')
 kunion k k' = KPlus k k'
 
+
+kapply = KApply
+
 kstar (KEps) = kepsilon
 kstar (KZ) = kzero
 kstar (KIter k) = kstar k

@@ -145,6 +145,9 @@ main = do
   args <- getArgs
   let (file, kat, num, auto) = parseArgs args
   contents <- readFile file
+  () <- putStrLn $ if kat then "KAT MODE" else
+                     if auto then "AUTO MODE" else
+                       "GS MODE"
   putStrLn $ if kat
              then showKatTerms $ parse contents
              else showQueryResults num auto $ parse contents

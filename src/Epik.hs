@@ -24,7 +24,7 @@ import AutoDeriv
 {- END INTERNAL MODULES -}
   
 data Action = Action { name :: AtomicProgram
-                     , program :: Kat AtomicProgram
+                     , prim :: (Atom, AtomicProgram, Atom)
                      } deriving (Eq, Show)
 
 nameStr :: Action -> String
@@ -32,6 +32,13 @@ nameStr = show . name
 
 lookupAction :: AtomicProgram -> [Action] -> Maybe Action
 lookupAction p = find (\a -> name a == p)
+
+singleProg :: Action -> Kat AtomicProgram
+singleProg a = let (pre, act, post) = prim a in
+               katom (posa pre) `kseq` kvar act `kseq` katom (posa post)
+
+tripleProg :: Action -> Kat (Atom, AtomicProgram, Atom)
+tripleProg = kvar . prim
 
 data Context =
   Context { alphabetc :: Set AtomicTest
@@ -50,9 +57,14 @@ instance Show Context where
 
 
 
-compileAction :: AtomicProgram -> Kat AtomicProgram -> Action
-compileAction name k =
-  Action { name = name, program = subst (AtomicProgram "id") name k }
+compileActions :: [Atom] -> AtomicProgram -> Kat AtomicProgram -> [Action]
+compileActions atoms name k =
+  let prog = subst (AtomicProgram "id") name k in
+  let strings = gs_interp atoms prog in
+  [ Action { name = name
+           , prim = (prec, name, post) }
+  | prec <- map first strings
+  , post <- map last strings ]
 
 -- substiutes every occurence of obs for rplc in kat expr
 subst obs rplc KZ = kzero
@@ -78,7 +90,7 @@ compileDecls (Program alphabet asserts actions views queries) =
   Context { alphabetc = alphabet
           , atomsc = atoms
           , assertion = assertion
-          , actionsc = map (\(n, p) -> compileAction n p) actions
+          , actionsc = concatMap (\(n, p) -> compileActions atoms n p) actions
           , viewsc = views
           , queriesc = queries
           
@@ -89,6 +101,9 @@ scopeFor qs name = takeWhile (\(n, _, _) -> n /= name) qs
 
 atomicActions :: Context -> Set AtomicProgram
 atomicActions ctx = foldr (\x -> Set.insert (name x)) Set.empty (actionsc ctx)
+
+atomicActionsTriple :: Context -> Set (Atom, AtomicProgram, Atom)
+atomicActionsTriple ctx = foldr (\x -> Set.insert (prim x)) Set.empty (actionsc ctx)
 
 -- atomsCtx :: Context -> [Atom]
 -- atomsCtx ctx = inducedAtoms (assertion ctx) $ allAtoms (alphabetc ctx)
@@ -117,9 +132,9 @@ accShow :: Show a => String -> a -> String -> String
 accShow sep x str = sep ++ show x ++ str
 
 showQueryResults :: Int -> Bool -> Declarations -> String
-showQueryResults num useStrings decls =
-  -- let queries = if useStrings then runQueries decls else runQueriesAuto decls in
-  let queries = runQueries decls in
+showQueryResults num useAuto decls =
+  let queries = if useAuto then runQueriesAuto decls else runQueries decls in
+--  let queries = runQueries decls in
     foldr (\(name, comments, gsTraces) accStr ->
                 let gsStr = foldr (accShow "\n\t") "\n" (sortOn gsLen$ takeUnique num gsTraces)  in
                 let header = name ++ " identifies the following strings:" in
@@ -134,9 +149,9 @@ showQueryResults num useStrings decls =
 showKatTerms :: Declarations -> String
 showKatTerms decls =
   let ctx = compileDecls decls in
-    concatMap (\(n, cs, aks) -> cs ++ "\n" ++ n ++ " becomes KAT expressions: \n" ++
+    concatMap (\(n, cs, k) -> cs ++ "\n" ++ n ++ " becomes KAT expressions: \n" ++
                 -- "\t" ++ show ukat ++ "\n\t+\n" ++
-                concatMap (\k -> "\t" ++ show k ++ "\n") aks ++ "\n") $
+                show k ++ "\n") $
     map (\(n,c, q) -> ( n, c, desugar ctx (scopeFor (queries decls) n) q)) $ queries decls
 
 ----------------------------------------------------------------------------------
@@ -178,7 +193,7 @@ liftGS ctx alt gs'@(Prog atom p gs) =
     Just alts ->
       let katOfProg s = s `lookupAction` actionsc ctx in
       let altA = mapMaybe katOfProg alts in
-      let altQ = map (queryOfKat . program) altA in        
+      let altQ = map (queryOfKat . singleProg) altA in        
       let altGS = concatMap (gs_interpQ ctx) altQ in
       -- error ((show [Single atom]) ++ " <> " ++ (show p) ++ " <> " ++ show (liftGS ctx alt gs) ++ " ==== " ++ show (
         if gsLen gs == 0 then altGS else 
@@ -212,31 +227,33 @@ queryOfKat (KPlus k k') = binop queryOfKat QUnion k k'
 queryOfKat (KAnd k k') = binop queryOfKat QIntersect k k'
 queryOfKat (KIter k) = QStar $ queryOfKat k
 
-katOfQuery :: Context -> QueryData ->  Query -> [Kat AtomicProgram]
-katOfQuery ctx scope QEmpty = [kzero]
-katOfQuery ctx scope QEpsilon = [kepsilon]
-katOfQuery ctx scope QAll = [Set.foldr (kunion . kvar) kzero $ atomicActions ctx]
+katOfQuery :: Context -> QueryData ->  Query -> Kat (Atom, AtomicProgram, Atom)
+katOfQuery ctx scope QEmpty = kzero
+katOfQuery ctx scope QEpsilon = kepsilon
+katOfQuery ctx scope QAll = Set.foldr (kunion . kvar) kzero $ atomicActionsTriple ctx
 katOfQuery ctx scope (QIdent s) =
   case s `lookupQ` scope  of
     Just q  -> katOfQuery ctx scope q
-    Nothing -> [kvar $ AtomicProgram s]
-katOfQuery ctx scope (QTest t) = [ktest t]
+    Nothing -> case AtomicProgram s `lookupAction` actionsc ctx of
+      Just act -> kvar $ prim act
+      Nothing -> error ("Could not find action " ++ s)
+katOfQuery ctx scope (QTest t) = ktest t
 katOfQuery ctx scope (QApply (QIdent agent) q) =
   case agent `lookup` viewsc ctx of
     Nothing -> error ("Could not find agent \"" ++ agent ++ "\"")
-    Just f  -> [ kapply (lift f) k | k <- katOfQuery ctx scope q ]
+    Just f  -> kapply agent $ katOfQuery ctx scope q
                -- lift f `map` katOfQuery ctx scope q
 katOfQuery ctx scope (QApply _ _) = error "function application must be with an agent"
 katOfQuery ctx scope (QConcat q q') =
-  [kseq k k' | k <- katOfQuery ctx scope q, k' <- katOfQuery ctx scope q' ]
+  katOfQuery ctx scope q `kseq` katOfQuery ctx scope q'
 katOfQuery ctx scope (QUnion q q') =
-  [ kunion k k' | k <- katOfQuery ctx scope q, k' <- katOfQuery ctx scope q']
+  katOfQuery ctx scope q `kunion` katOfQuery ctx scope q'
 katOfQuery ctx scope (QIntersect q q') =
-  [ kand k k' | k <- katOfQuery ctx scope q, k' <- katOfQuery ctx scope q']
+  katOfQuery ctx scope q `kand` katOfQuery ctx scope q'
 katOfQuery ctx scope (QStar q) =
-  [ kstar k | k <- katOfQuery ctx scope q ]
+  kstar (katOfQuery ctx scope q)
 katOfQuery ctx scope (QComplement q) =
-  [ kneg k | k <- katOfQuery ctx scope q]
+  kneg (katOfQuery ctx scope q)
   
 --  concatMap (\k -> map (kunion k) (katOfQuery ctx scope $ QConcat q $ QConcat QAll $ QStar QAll)) $
   -- case q of
@@ -265,26 +282,58 @@ katOfQuery ctx scope (QComplement q) =
   --                      QUnion (QComplement q) (QComplement q')
   --   QStar q -> [kzero]
 
-mkAutoL' :: Context -> Kat AtomicProgram -> Auto [State Atom (Kat AtomicProgram)]
-mkAutoL' ctx = mkAutoL (atomsc ctx) (Set.toList $ atomicActions ctx)
+mkAuto' :: Context -> (Agent -> AtomicProgram -> Maybe [(Atom, AtomicProgram, Atom)]) -> Kat (Atom, AtomicProgram, Atom) -> Auto (State Atom (Kat (Atom, AtomicProgram, Atom)))
+mkAuto' ctx = mkAuto (atomsc ctx) (Set.toList $ atomicActions ctx)
 
 
-compile :: Context -> QueryData -> Query -> Auto [State Atom (Kat AtomicProgram)]
+compile :: Context -> QueryData -> Query -> Auto (State Atom (Kat (Atom, AtomicProgram, Atom)))
 compile ctx scope query =
-  foldr1 intersectAutoL $
-  mkAutoL' ctx `map`
-  desugar ctx scope query
+  let getAlts agent act =
+        case agent `lookup` viewsc ctx of
+          Nothing -> error ("Cannot Compile, Agent " ++ agent ++ " has not been defined")
+          Just agView ->
+            case act `Map.lookup` agView of
+              Nothing -> error ("Cannot Compile Agent " ++ agent ++ " does not have a defined alternative for " ++ show act )
+              Just alts ->
+                Just $
+                map (\prog ->
+                        case prog `lookupAction` actionsc ctx of
+                          Nothing -> error ("UseBeforeDefError on action " ++ show act)
+                          Just act -> prim act
+                    ) alts
+  in
+  mkAuto' ctx getAlts $
+  desugarTriple ctx scope query
 
 fstApply :: (a -> b) -> (a,c) -> (b, c)
 fstApply f (x, y) = (f x, y)
   
-desugar :: Context -> QueryData -> Query -> [Kat AtomicProgram]
+desugarTriple :: Context -> QueryData -> Query -> Kat (Atom, AtomicProgram, Atom)
+desugarTriple ctx scope query =
+  katOfQuery ctx scope query
+
+desugar :: Context -> QueryData -> Query -> Kat AtomicProgram
 desugar ctx scope query =
   -- factorUnions $
   -- map divideUnions $ -- [Set Kat]
-  map (substActions (actionsc ctx)) $ -- [Kat]
-  nub $
+  substActions (actionsc ctx) $ -- [Kat]
+  tripleToSingle $
   katOfQuery ctx scope query
+
+tripleToSingle :: Kat (Atom, AtomicProgram, Atom) -> Kat AtomicProgram
+tripleToSingle KZ = KZ
+tripleToSingle KEps = KEps
+tripleToSingle (KBool t) = KBool t
+tripleToSingle (KEvent (pre, act, post)) = katom (posa pre)
+                                           `kseq` kvar act
+                                           `kseq` katom (posa post)
+tripleToSingle (KSequence k k') = binop tripleToSingle KSequence k k'
+tripleToSingle (KPlus k k') = binop tripleToSingle KPlus k k'
+tripleToSingle (KAnd k k') = binop tripleToSingle KAnd k k'
+tripleToSingle (KIter k) = KIter (tripleToSingle k)
+tripleToSingle (KApply s k) = KApply s $ tripleToSingle k
+tripleToSingle (KNeg k) = KNeg $ tripleToSingle k
+
 
 allEqual :: Eq a => [a] -> Maybe a
 allEqual [] = Nothing
@@ -323,11 +372,9 @@ unroll n (KIter k) =
 computeGuardedStrings :: Context -> QueryData -> Query -> [GuardedString]
 computeGuardedStrings ctx scope query =
 --  let (unionKat, andKats) = desugar ctx scope query in
-  let kats = desugar ctx scope query in
+  let kat = desugar ctx scope query in
   let denote = gs_interp $ atomsc ctx in
-  -- denote unionKat ++ 
-  (intersectLazy' $
-   map (denote . (unroll 6)) kats)
+    denote $ unroll 6 kat
 
 
 injectProg :: AtomicProgram -> (Atom, Atom) -> Kat AtomicProgram
@@ -341,7 +388,7 @@ substActions actions (KBool t) =  ktest t
 substActions actions (KEvent p) =
   case p `lookupAction` actions of
     Nothing -> (kvar p)
-    Just a  -> program a
+    Just a  -> singleProg a
 substActions actions (KSequence k k') =
   substActions actions k `kseq`
   substActions actions k'
@@ -357,12 +404,12 @@ substActions actions (KIter k) =
 gs_interpQ :: Context -> Query -> [GuardedString]
 gs_interpQ ctx QEmpty = []
 gs_interpQ ctx QEpsilon = [(Single a) | a <- atomsc ctx]
-gs_interpQ ctx QAll = concatMap ((gs_interpQ ctx) . queryOfKat . program) $ actionsc ctx
+gs_interpQ ctx QAll = concatMap ((gs_interpQ ctx) . queryOfKat . singleProg) $ actionsc ctx
 gs_interpQ ctx (QTest t) =
   [(Single a) | a <- atomsc ctx, eval (atomToWorld a) t]
 gs_interpQ ctx (QIdent s) =
   case AtomicProgram s `lookupAction` actionsc ctx of
-    Just x -> gs_interp (atomsc ctx) $ program x
+    Just x -> gs_interp (atomsc ctx) $ singleProg x
     Nothing -> case s `lookupQ` queriesc ctx of
                  Just q -> gs_interpQ ctx q
                  Nothing -> error ("USEBEFOREDEF " ++ s)
