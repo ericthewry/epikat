@@ -22,9 +22,10 @@ data Kat p =
   | KEvent p -- KVar :: AtomicProgram -> Kat
   | KSequence (Kat p) (Kat p)       -- KSeq :: Kat -> Kat -> Kat  
   | KPlus (Kat p) (Kat p)     -- KUnion :: Kat -> Kat -> Kat
-  | KApply (Map p [p]) (Kat p)
   | KAnd (Kat p) (Kat p)
   | KIter (Kat p)          -- KStar :: Kat -> Kat
+  | KApply String (Kat p)
+  | KNeg (Kat p)
   deriving (Eq, Ord)
 
 instance Show a => Show (Kat a) where
@@ -36,10 +37,19 @@ instance Show a => Show (Kat a) where
   show (KPlus p q) = "(" ++ show p ++ " + " ++ show q ++ ")"
   show (KAnd p q) = "(" ++ show p ++ " & " ++ show q ++ ")"
   show (KIter p) = "(" ++ show p ++ ")*"
+  show (KApply agent p) = "<" ++ agent ++ ">(" ++ show p ++ ")"
+  show (KNeg p) = "~(" ++ show p ++ ")"
 
 kzero = KZ
 kepsilon = KEps
 kvar = KEvent
+
+kneg :: Kat p -> Kat p
+kneg KZ = kepsilon
+kneg KEps = kzero
+kneg (KBool t) = ktest $ tneg t
+kneg (KNeg k) = k
+kneg k = KNeg k
 
 kseq KEps k' = k'
 kseq k KEps = k
@@ -59,11 +69,11 @@ kstar (KIter k) = kstar k
 kstar k = KIter k
 
 ktest = KBool
+katom = ktest . (Set.foldr (tand . tvar) ttrue)
 
 kand KZ _ = KZ
 kand _ KZ = KZ
 kand k k' = KAnd k k'
-
 
 data Test =
   TTrue
@@ -81,6 +91,29 @@ instance Show Test where
   show (TOr p q) = show p ++ " + " ++ show q
   show (TVar v) = show v
   show (TNeg x) = "~" ++ show x
+
+
+ttrue = TTrue
+tfalse = TFalse
+
+tvar = TVar
+
+tand TTrue b = b
+tand b TTrue = b
+tand TFalse _ = TFalse
+tand _ TFalse = TFalse
+tand a b = TAnd a b
+
+tor TTrue _ = TTrue
+tor _ TTrue = TTrue
+tor TFalse b = b
+tor b TFalse = b
+tor a b = TOr a b
+
+tneg TTrue = TFalse
+tneg TFalse = TTrue
+tneg (TNeg a) = a
+tneg a = TNeg a
 
 
 ifElse :: Test -> Kat p -> Kat p -> Kat p
