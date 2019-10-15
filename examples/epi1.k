@@ -94,26 +94,4 @@ query a_box_a_peek = _ & ~aly(~bob_peek_H)
 query a_box_a_peek_concat_pah1 = (_;_) &  ~aly(~(bob_peek_H ; announce_H))
 
 -- 8. Worlds of length two where it is tails
-query two_tails = (_;_) 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+query two_tails = test T ;_;_
