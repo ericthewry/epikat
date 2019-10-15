@@ -26,6 +26,8 @@ dependencies:
 - mtl
 - universe
 - universe-base
+- hspec
+- QuickCheck
 
 library:
   source-dirs: src

@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 7ea7e9dd10450bf53bdf01a8e019340d8ff7cdfad5ed5c32b98816c2900efa9f
+-- hash: 4a28a35fbd30d9c8dbf0562b6e376de74d9eb16828efd5115826edfe4b4a3388
 
 name:           epik
 version:        0.1.0.0
@@ -39,9 +39,11 @@ library
   hs-source-dirs:
       src
   build-depends:
-      array
+      QuickCheck
+    , array
     , base >=4.7 && <5
     , containers
+    , hspec
     , mtl
     , universe
     , universe-base
@@ -55,10 +57,12 @@ executable epik-exe
       app
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      array
+      QuickCheck
+    , array
     , base >=4.7 && <5
     , containers
     , epik
+    , hspec
     , mtl
     , universe
     , universe-base
@@ -73,10 +77,12 @@ test-suite epik-test
       test
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      array
+      QuickCheck
+    , array
     , base >=4.7 && <5
     , containers
     , epik
+    , hspec
     , mtl
     , universe
     , universe-base

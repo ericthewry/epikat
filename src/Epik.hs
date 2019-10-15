@@ -286,23 +286,24 @@ mkAuto' :: Context -> (Agent -> AtomicProgram -> Maybe [(Atom, AtomicProgram, At
 mkAuto' ctx = mkAuto (atomsc ctx) (Set.toList $ atomicActions ctx)
 
 
+getAlts :: Context -> Agent -> AtomicProgram -> Maybe [(Atom, AtomicProgram, Atom)]
+getAlts ctx agent act =
+  case agent `lookup` viewsc ctx of
+    Nothing -> error ("Cannot Compile, Agent " ++ agent ++ " has not been defined")
+    Just agView ->
+      case act `Map.lookup` agView of
+        Nothing -> error ("Cannot Compile Agent " ++ agent ++ " does not have a defined alternative for " ++ show act )
+        Just alts ->
+          Just $
+          map (\prog ->
+                  case prog `lookupAction` actionsc ctx of
+                    Nothing -> error ("UseBeforeDefError on action " ++ show act)
+                    Just act -> prim act
+              ) alts
+
 compile :: Context -> QueryData -> Query -> Auto (State Atom (Kat (Atom, AtomicProgram, Atom)))
 compile ctx scope query =
-  let getAlts agent act =
-        case agent `lookup` viewsc ctx of
-          Nothing -> error ("Cannot Compile, Agent " ++ agent ++ " has not been defined")
-          Just agView ->
-            case act `Map.lookup` agView of
-              Nothing -> error ("Cannot Compile Agent " ++ agent ++ " does not have a defined alternative for " ++ show act )
-              Just alts ->
-                Just $
-                map (\prog ->
-                        case prog `lookupAction` actionsc ctx of
-                          Nothing -> error ("UseBeforeDefError on action " ++ show act)
-                          Just act -> prim act
-                    ) alts
-  in
-  mkAuto' ctx getAlts $
+  mkAuto' ctx (getAlts ctx) $
   desugarTriple ctx scope query
 
 fstApply :: (a -> b) -> (a,c) -> (b, c)

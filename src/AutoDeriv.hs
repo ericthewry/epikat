@@ -71,6 +71,11 @@ setSeq ps qs = Set.fold (\q rst -> Set.map (\p -> kseq p q) ps `Set.union` rst) 
 binop :: (a -> b) -> (b -> b -> b) -> a -> a -> b
 binop f op x y = f x `op` f y
 
+
+accepting :: State Atom (Kat p) -> Bool
+accepting (AtExp (at, expr)) = nullable at expr
+accepting (Exp _) = False
+
 nullable :: Atom -> (Kat p) -> Bool
 nullable atom KZ = False
 nullable atom KEps = True
@@ -81,28 +86,17 @@ nullable atom (KPlus k k') = binop (nullable atom) (||) k k'
 nullable atom (KSequence k k') = binop (nullable atom) (&&) k k'
 nullable atom (KAnd k k') = binop (nullable atom) (&&) k k'
 nullable atom (KIter k) = True
-nullable atom (KApply _ k) = nullable atom k -- [TODO] Not Correct!!
+nullable atom (KApply _ k) = nullable atom k -- [TODO] Maybe Correct?
 
-accepting :: State Atom (Kat p) -> Bool
-accepting (AtExp (at, expr)) = nullable at expr
-accepting (Exp _) = False
-
-
--- accepts :: GuardedString -> Kat (Atom, AtomicProgram, Atom) -> Bool
--- accepts (Single at) k = nullable at k
--- accepts (Prog at prim gstr) k =
---   any id [ accepts gstr k' | k' <- Set.toList $ deriv' prim (at,k)]
-
-
-deriv' :: Ord p =>
+deriv' :: (Ord p, Show p) =>
   p
   -> (Agent -> p -> Maybe [(Atom, p, Atom)])
   -> (Atom, Kat (Atom, p, Atom))
   -> Set (Kat (Atom, p, Atom))
 deriv' act _ (atom, KZ) = Set.empty
 deriv' act _ (atom, KEps) = Set.empty
-deriv' act _ (atom, KNeg KZ) = Set.singleton kepsilon
-deriv' act _ (atom, KNeg KEps) = Set.singleton kzero
+deriv' act _ (atom, KNeg KZ) = Set.empty
+deriv' act _ (atom, KNeg KEps) = Set.empty
 deriv' act f (atom, KNeg k) = kneg `Set.map` deriv' act f (atom, k)
 deriv' act _ (atom, KEvent (pre, act', post))
   | atom == pre && act == act' = Set.singleton $ katom (posa post)
@@ -114,16 +108,21 @@ deriv' act f (atom, KAnd k k') = deriv' act f (atom, k) `Set.intersection` deriv
 deriv' act f (atom, KSequence k k') =
   (if nullable atom k
    then deriv' act f (atom, k')
-   else Set.empty)
+   else Set.singleton kzero)
   `Set.union`
   Set.fromList [k'' `kseq` k' | k'' <- Set.toList $ deriv' act f (atom, k)]
 
 deriv' act f (atom, KApply agent k) =
   case f agent act of
-    Nothing -> Set.singleton kzero
+    Nothing -> error ("could not find agent " ++ agent ++ " and action " ++ show act)
     Just alts ->
-      Set.fromList [ KApply agent k' | (pre, alt, post) <- alts
-                                     , k' <- Set.toList $ deriv' alt f (atom, k)]
+      Set.fromList $
+      [ kapply agent k' | (pre, alt, post) <- alts
+                        , k' <- Set.toList $ deriv' alt f (post, k)
+                        , pre == atom ]
+      ++ [kzero | (pre, alt, post) <- alts
+                , pre /= atom]
+      
 
 deriv' act f (atom, ks@(KIter k)) =
   Set.fromList [k' `kseq` ks | k' <- Set.toList $ deriv' act f (atom, k) ]

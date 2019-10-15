@@ -63,8 +63,10 @@ kunion k KZ = k
 kunion (KBool t) (KBool t') = ktest (t `TOr` t')
 kunion k k' = KPlus k k'
 
-
-kapply = KApply
+kapply agent KZ = kzero
+kapply agent KEps = kepsilon
+kapply agent t@(KBool _) = t
+kapply agent k = KApply agent k
 
 kstar (KEps) = kepsilon
 kstar (KZ) = kzero
