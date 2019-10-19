@@ -92,40 +92,62 @@ deriv' :: (Ord p, Show p) =>
   p
   -> (Agent -> p -> Maybe [(Atom, p, Atom)])
   -> (Atom, Kat (Atom, p, Atom))
-  -> Set (Kat (Atom, p, Atom))
-deriv' act _ (atom, KZ) = Set.empty
-deriv' act _ (atom, KEps) = Set.empty
-deriv' act _ (atom, KNeg KZ) = Set.empty
-deriv' act _ (atom, KNeg KEps) = Set.empty
-deriv' act f (atom, KNeg k) = kneg `Set.map` deriv' act f (atom, k)
-deriv' act _ (atom, KEvent (pre, act', post))
-  | atom == pre && act == act' = Set.singleton $ katom (posa post)
-  | otherwise = Set.empty
-deriv' act _ (atom, KBool _ ) = Set.empty                           
-deriv' act f (atom, KPlus k k') =
-  deriv' act f (atom, k) `Set.union` deriv' act f (atom, k')
-deriv' act f (atom, KAnd k k') = deriv' act f (atom, k) `Set.intersection` deriv' act f (atom, k')
+  -> (Atom, Kat (Atom, p, Atom))
+deriv' act _ (atom, KZ) = (atom, kzero)
+deriv' act _ (atom, KEps) = (atom, kzero)
+deriv' act f (atom, KEvent (pre', act', post'))
+  | atom == pre'
+  = case f "GOD" act of
+      Nothing -> error ("No GOD for " ++ show act)
+      Just conds -> if (pre', act', post') `elem` conds
+                    then (post', kepsilon)
+                    else (post', kzero)
+  | otherwise = kzero
+deriv' act _ (atom, KBool _ ) = (atom, kzero)
+deriv' act f (atom, KPlus k k') = -- ASSUMPTION :: ACTIONS ARE DETERMINISTIC
+  let (_, dk) =  deriv' act f (atom, k) in
+  let (_, dk') = deriv' act f (atom, k) in
+  let alts = f "GOD" act in
+  case find alts (\(pre, a, post) -> pre == atom && a == act) of
+    Nothing -> error ("No God for " ++ show atom ++ show act)
+    (Just (_, _, post)) -> (post, dk `kunion` dk')
+      
+deriv' act f (atom, KAnd k k') =
+  deriv' act f (atom, k) `kand` deriv' act f (atom, k')
 deriv' act f (atom, KSequence k k') =
   (if nullable atom k
    then deriv' act f (atom, k')
-   else Set.singleton kzero)
-  `Set.union`
-  Set.fromList [k'' `kseq` k' | k'' <- Set.toList $ deriv' act f (atom, k)]
+   else kzero)
+  `kunion`
+  deriv' act f (atom, k) `kseq` k'
 
 deriv' act f (atom, KApply agent k) =
   case f agent act of
     Nothing -> error ("could not find agent " ++ agent ++ " and action " ++ show act)
     Just alts ->
-      Set.fromList $
-      [ kapply agent k' | (pre, alt, post) <- alts
-                        , k' <- Set.toList $ deriv' alt f (post, k)
-                        , pre == atom ]
-      ++ [kzero | (pre, alt, post) <- alts
-                , pre /= atom]
-      
+      foldr kunion kzero $
+      [ kapply agent $ deriv' alt f (post, k)
+      | (pre, alt, post) <- alts
+      , pre == atom ]
 
 deriv' act f (atom, ks@(KIter k)) =
-  Set.fromList [k' `kseq` ks | k' <- Set.toList $ deriv' act f (atom, k) ]
+  (deriv' act f (atom, k)) `kseq` ks
+
+deriv' act _ (atom, KNeg KZ) = (atom, kzero)
+deriv' act _ (atom, KNeg KEps) = (atom, kzero)
+deriv' act f (atom, KNeg (KEvent (pre', act', post')))
+  | atom == pre'
+  =
+  if act == act' then (atom, kzero) else
+    case f "GOD" act of
+      Nothing -> error ("No GOD for " ++ show act)
+      Just conds ->
+        foldr kunion kzero $
+        [ katom (posa post) | (_, _, post) <- conds ]
+
+  | otherwise = kzero
+deriv' act f (atom, KNeg k) = kneg $ deriv' act f (atom, k)  
+
 
 
 derivE :: Atom -> Kat p -> Set (State Atom (Kat p))
@@ -163,10 +185,10 @@ nextHopsP :: Kat (Atom, AtomicProgram, Atom)
           -> [AtomicProgram]
           -> (Agent -> AtomicProgram -> Maybe [(Atom, AtomicProgram, Atom)])
           -> [(Cond, State Atom (Kat (Atom, AtomicProgram, Atom)))]
-nextHopsP k atom progs f = concatMap (\act ->
-                                        Set.foldr' (\k -> (:) (CProg act, Exp k)) []
-                                       $ deriv' act f (atom,k))
-                           progs
+nextHopsP k atom progs f =
+  map (\act ->
+          (CProg act, Exp $ deriv' act f (atom,k)))
+  progs
 
                  
 

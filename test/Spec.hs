@@ -87,52 +87,78 @@ main = hspec $ do
   
   describe "Derivative of Negation" $ do
     it "returns 0 for ~1 with bph heads" $ do
-      deriv bph (heads, KNeg KEps) `shouldBe` Set.empty
+      deriv bph (heads, KNeg KEps) `shouldBe` kzero
   
     it "no derivs for ~0 with bph tails" $ do
-      deriv bph (heads, KNeg KZ) `shouldBe` Set.empty
+      deriv bph (heads, KNeg KZ) `shouldBe` kzero
       
     it "returns 0 for ~(h,bph,h) with bph,heads" $ do
       deriv bph (heads, kneg $ kvar (heads, bph, heads))
-        `shouldBe` Set.singleton (katom (posa heads))
+        `shouldBe` kzero
 
-    it "returns test 0 for ~(h, bph, h) with bph, tails" $ do
+    it "returns 0 for ~(h, bph, h) with bph, tails" $ do
       deriv bph (tails, kneg $ kvar (heads, bph, heads))
-        `shouldBe` Set.empty
+        `shouldBe` kzero
+
+    -- it "returns test
+    it "interacts externally with modality" $ do
+      deriv bph (heads, kneg $ kapply "aly" $ kneg (kvar (heads, bph, heads) `kseq` kvar (heads, pah, heads)))
+        `shouldBe` kzero
+
+    it "does something for sequences" $ do
+      deriv bph (heads, kneg (kvar (heads, bph, heads) `kseq` kvar (heads, pah, heads)))
+        `shouldBe` (katom' heads `kseq` kvar (heads, pah, heads))
+
+
+    it "computes personal knowledge (postive)" $ do
+      -- ~<aly>~(aly_peek_H)
+      deriv aph (heads, kneg $ kapply "aly" $ kneg $ kvar (heads, aph, heads))
+      `shouldBe` (katom' heads)
+
+    it "doesn't leak unknown personal knowledge (negative)" $ do
+      deriv apt (heads, kneg $ kapply "aly" $ kneg $ kvar (heads, aph, heads))
+      `shouldBe` kzero
+
+    it "Translates world state" $ do
+      deriv apt (heads, kneg $ kvar (heads, aph, heads))
+      `shouldBe` katom tails
+
+    
+      
 
   describe "Derivative of Sequence" $ do
     it "returns (h)?;(h,pah,h) for D bph (heads, ((h,bph,h);(h,pah,h)))" $ do
       deriv bph (heads, kvar (heads, bph, heads) `kseq` kvar (heads, pah, heads))
-      `shouldBe` Set.singleton (katom' heads `kseq` kvar (heads, pah, heads))
+      `shouldBe` katom' heads `kseq` kvar (heads, pah, heads)
 
   describe "Derivative of Diamond" $ do
     it "returns <aly>(h?) for D pah (h, <aly> (h,pah,h))" $ do
       deriv pah (heads, kapply "aly" (kvar (heads, pah, heads)))
-        `shouldBe` Set.singleton (kapply "aly" $ katom' heads)
+        `shouldBe` (kapply "aly" $ katom' heads)
 
     it "returns <aly>(h?) for D pah (h, <aly>(h;(h,pah,h)))" $ do
       deriv pah (heads, kapply "aly" $ katom' heads `kseq` kvar (heads, pah, heads))
-      `shouldBe` Set.singleton (kapply "aly" $ katom' heads)
+      `shouldBe` (kapply "aly" $ katom' heads)
 
     it "returns <aly>(h;(h,pah,h)) for D bph (h, <aly> ((h,bph,h);(h,pah,h)))" $do
       deriv bph (heads, kapply "aly" $ kvar (heads, bph, heads) `kseq` kvar (heads, pah, heads))
-        `shouldBe` Set.fromList [kzero, kapply "aly" (katom' heads `kseq` kvar (heads, pah, heads))]
+        `shouldBe` kapply "aly" (katom' heads `kseq` kvar (heads, pah, heads))
 
     it "returns 0 for D bph (t, <aly> ((h,bph,h);(h,pah,h)))" $ do
       deriv bph (tails, kapply "aly" (kvar (heads, bph, heads) `kseq` kvar (heads, pah, heads)))
-        `shouldBe` Set.singleton kzero
+        `shouldBe` kzero
 
     it "returns 0 for D pah T <aly>((T);((H~T),announce_H,(H~T)))" $ do
       deriv pah (tails, kapply "aly" (katom' tails `kseq` kvar (heads, pah, heads)))
-      `shouldBe` Set.singleton kzero
+      `shouldBe` kzero
 
     it "returns 0 for D pah H <aly>((T);((H~T),announce_H,(H~T)))" $ do
       deriv pah (heads, kapply "aly" (katom' tails `kseq` kvar (heads, pah, heads)))
-        `shouldBe` Set.singleton kzero
+        `shouldBe`kzero
 
     it "returns something for D bpt (h, <aly>((h,bph,h);(h,pah,h)))" $ do
       deriv bpt (heads, kapply "aly" (kvar (heads, bph, heads) `kseq` kvar (heads, pah, heads)))
-      `shouldBe` Set.empty
+      `shouldBe` kzero
 
 
   describe "nullable of Diamond" $ do
@@ -143,3 +169,4 @@ main = hspec $ do
     it "returns fals for E tails <aly>h" $ do
       nullable tails (kapply "aly" $ katom' heads)
       `shouldBe` False
+

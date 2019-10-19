@@ -289,7 +289,13 @@ mkAuto' ctx = mkAuto (atomsc ctx) (Set.toList $ atomicActions ctx)
 getAlts :: Context -> Agent -> AtomicProgram -> Maybe [(Atom, AtomicProgram, Atom)]
 getAlts ctx agent act =
   case agent `lookup` viewsc ctx of
-    Nothing -> error ("Cannot Compile, Agent " ++ agent ++ " has not been defined")
+    Nothing ->
+      if agent == "GOD"
+      then case act `lookupAction` actionsc ctx of
+             Nothing -> error ("UseBeforeDefError on action " ++ show act)
+             Just act -> Just [prim act]
+      else
+        error ("Cannot Compile, Agent " ++ agent ++ " has not been defined")
     Just agView ->
       case act `Map.lookup` agView of
         Nothing -> error ("Cannot Compile Agent " ++ agent ++ " does not have a defined alternative for " ++ show act )
