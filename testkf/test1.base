@@ -1,0 +1,33 @@
+Com(1. Worlds where the world announce_H is a possibility for aly.)
+Com(The result is the unit set.)
+Com(GOOD)
+Query2(Epi1ah,Aly(World(announce_H)))
+
+Com(2. Worlds where the world announce_T is a possibility for aly.)
+Com(Symmetric to 1.)
+Com(GOOD)
+Query2(Epi1ah,Aly(World(announce_T)))
+
+Com(3. Worlds where aly_peek_H is a possibility for aly.)
+Com(There is just one possibility, because there are no other actions)
+Com(that generate this option for aly.)
+Com(GOOD)
+Query2(aapeek,Aly(World(aly_peek_H)))
+
+Com(4. Worlds where bob_peek_H is a possibility for aly.)
+Com(It should be bob_peek_H + bob_peek_T.)
+Com(GOOD we get those two worlds.)
+Query2(abpeek,Aly(World(bob_peek_H)))
+
+
+Com(Now test the box modality.)
+Com(4a. Worlds where every alternative for aly is aly_peek_H,)
+Com(i.e. aly_peek_H is the sole alternative for aly.)
+Com(It should be the unit set of aly_peek_H.)
+Com(GOOD)
+Com(The top-level intersection with _ needed in Epik because currently)
+Com(the implementation approximates the set. This should be fixed with when)
+Com(an automaton construction is implemented.)
+Query2(aboxapeek,And(Ev,Boxaly(World(aly_peek_H))))
+
+
