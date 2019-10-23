@@ -1,0 +1,47 @@
+Com(One event.)
+Query2(One,Ev)
+
+Com(Two events.)
+Query2(Two,Con(Ev,Ev))
+
+Com(5a. Worlds where every alternative for aly is aly_peek_H,)
+Com(out intersection at the top.)
+Com(i.e. aly_peek_H is the sole alternative for aly.)
+Com(It should be the unit set of aly_peek_H.)
+Com(Without the intersection we get longer worlds in epik, because of approximation.)
+Query2(AlyBoxAlyPeek,And(One,Boxaly(World(aly_peek_H))))
+
+Com(5b. Similar but with iteration of belief.)
+Query2(AlyBoxAlyPeek,And(One,Boxaly(Boxaly(World(aly_peek_H)))))
+
+Com(6a. Worlds where every alternative for aly is bob_peek_H,)
+Com(i.e. bob_peek_H is the sole alternative for aly.)
+Com(This should be null. There is no way for aly to get this)
+Com(information in one step.)
+Query2(AlyBoxBobPeek,And(One,Boxaly(World(bob_peek_H))))
+
+Com(6b. Worlds where some alternative for aly is bob_peek_H)
+Com(This should be bob_peek_H + bob_peek_T)
+Query2(AlyBoxBobPeek,And(One,Diaaly(World(bob_peek_H))))
+
+Com(7. Worlds where every alternative for aly is of the form  (bob_peek_H.announce_H))
+Com(This lets Aly learn that it is H in the second event.)
+Com(The result should be the unit set of bob_peek_H.announce_H.)
+Query2(Example7,And(Two,Boxaly(Con(World(bob_peek_H),World(announce_H)))))
+
+Com(8. Similar but where the second event is any event.)
+Com(The result should be bob_peek_H.announce_H + bob_peek_H.aly_peek_H)
+Query2(Example8,And(Two,Boxaly(Con(World(bob_peek_H),Ev))))
+
+Com(9a. Bob knows that Aly knows that Bob peeked T in the first step)
+Com(The result should be bob_peek_H.announce_H + bob_peek_H.aly_peek_H)
+Query2(Example9a,And(Two,Boxbob(Boxaly(Con(World(bob_peek_T),Ev)))))
+
+Com(9b. Bob knows that Aly knows that Aly peeked T in the first step)
+Com(The result should be bob_peek_H.announce_H + bob_peek_H.aly_peek_H)
+Query2(Example9b,And(Two,Boxbob(Boxaly(Con(World(aly_peek_T),Ev)))))
+
+
+
+
+
