@@ -1,18 +1,23 @@
 %.k: %.kc
 	cat $*.kc | egrep -v '^--' > $*.k
 
-%.out: %.k
-	stack exec epik-exe 8 $*.k > $*.out
+%.k.out: %.k
+	stack exec epik-exe 8 $*.k > $*.k.out
+%.f.out: %.k
+	xfst -q -f $*.fst  > $*.f.out
 
-%.show: %.k
+%.k.show: %.k
 	stack exec epik-exe 8 $*.k
+%.f.show: %.fst
+	xfst -q -f $*.fst
 
-%.pdf: %.k %.out
-	enscript -b' ' -o $*.out.ps $*.out
-	enscript -b' ' -o $*.k.ps $*.k
-	ps2pdf $*.out.ps $*.out.pdf
-	ps2pdf $*.k.ps $*.k.pdf
-	rm $*.out.ps $*.k.ps
+%.kf.pdf: %.k.out %.f.out
+	enscript -b$* -o $*.k.out.ps $*.k.out
+	enscript -b$* -o $*.f.out.ps $*.f.out
+	ps2pdf $*.k.out.ps $*.k.out.pdf
+	ps2pdf $*.f.out.ps $*.f.out.pdf
+	pdftk $*.k.out.pdf $*.f.out.pdf cat output $*.kf.pdf
+	rm $*.k.out.ps $*.f.out.ps $*.k.out.pdf $*.f.out.pdf
 
 %.pdf: %.hs
 	enscript -b' ' -o $*.ps $*.hs
