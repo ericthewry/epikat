@@ -134,6 +134,7 @@ QueryKat : '0'                          { QEmpty }
          | QueryKat '+' QueryKat        { QUnion $1 $3 }
          | '~' QueryKat                 { QComplement $2 }
          | QueryKat '*'                 { QStar $1 }
+         | test Test                    { QTest $2 }
          | '(' QueryKat ')'             { $2 }
 
 {
