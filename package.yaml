@@ -26,6 +26,7 @@ dependencies:
 - mtl
 - universe
 - universe-base
+- stack
 
 library:
   source-dirs: src

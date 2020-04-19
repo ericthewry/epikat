@@ -102,7 +102,9 @@ listFuse xs ys = mapMaybe (uncurry fuse) (xs +*+ ys)
 xs +<>+ ys = xs `listFuse` ys
 
 elemApprox :: GuardedString -> [GuardedString] -> Bool
-elemApprox g = elemLeqLen (200*gsLen g) g
+
+-- Mats changed this from 200 to 3200 to increase resolution
+elemApprox g = elemLeqLen (3200*gsLen g) g
 
 elemLeqLen :: Integer -> GuardedString -> [GuardedString] -> Bool
 elemLeqLen _ _ [] = False

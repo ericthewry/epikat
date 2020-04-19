@@ -93,7 +93,8 @@ query Example8 = (Two & ~aly(~(bob_peek_H ; _)))
 query Example9a = (Two & ~bob(~~aly(~(bob_peek_T ; _))))
 
 -- 9b. Bob knows that Aly knows that Aly peeked T in the first step
--- The result should be bob_peek_H.announce_H + bob_peek_H.aly_peek_H
+-- The result should be aly_peek_T;announce_T + aly_peek_T.bob_peek_T.
+-- Aly peeks T in the first event and Bob figures it out in the second event.
 -- (Two & ~bob(~~aly(~(aly_peek_T ; _))))
 query Example9b = (Two & ~bob(~~aly(~(aly_peek_T ; _))))
 

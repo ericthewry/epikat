@@ -1,0 +1,52 @@
+* Test file
+
+epi1.k is the basic Epik program.
+test2.base has test examples. Note that test2.k and test2.fst are generated, don't edit them.
+
+Assemble them into epi1-test4.k with this.
+   make epi1-test2.k
+
+* Execution in Epik
+Go to the parent directory, and say this.
+
+   make testkf/epi1-test2.k.out
+
+* Execution in Fst
+In this directory, say this.
+  make epi1-test2.fst.out
+
+* We are getting different results with Epik and Fst for this test item.
+
+Haskell
+-- 9b. Bob knows that Aly knows that Aly peeked T in the first step
+-- The result should be aly_peek_T;announce_T + aly_peek_T.bob_peek_T.
+-- Aly peeks T in the first event and Bob figures it out in the second event.
+-- (Two & ~bob(~~aly(~(aly_peek_T ; _))))
+Example9b identifies the following strings:
+
+	aly_peek_T.announce_T.
+	aly_peek_T.aly_peek_T.
+	aly_peek_T.bob_peek_T.
+
+Fst
+-- 9b. Bob knows that Aly knows that Aly peeked T in the first step
+-- The result should be aly_peek_T;announce_T + aly_peek_T.bob_peek_T.
+-- Aly peeks T in the first event and Bob figures it out in the second event.
+-- (Two & Box(Rb,Box(Ra,Cn(World(aly_peek_T),Event))))
+
+T aly_peek_T T announce_T T
+T aly_peek_T T bob_peek_T T
+
+The world aly_peek_T.aly_peek_T in the Haskell Epik result is wrong, in this world Bob doesn't
+learn that Aly peeked T in the first event.
+
+* On the theory that the problem comes from the approximation in calculating negations, Mats experimented with adjusting this parameter in
+GuardedStrings.hs.
+
+-- Mats changed this from 200 to 3200 to increase resolution
+elemApprox g = elemLeqLen (3200*gsLen g) g
+
+It didn't resolve the bug.
+
+
+

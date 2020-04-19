@@ -1,5 +1,6 @@
 test1.fm4: fst.m4 test1.base
 	cat fst.m4 test1.base > test1.fm4
+
 test1.km4: k.m4 test1.base
 	cat k.m4 test1.base > test1.km4
 

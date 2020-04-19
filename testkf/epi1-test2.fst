@@ -281,7 +281,7 @@ echo -- Event
 regex One;
 print words
 echo -------------------------------------
-;
+
 
 echo -- Two events.
 define Two Cn(Event,Event);
@@ -360,7 +360,8 @@ echo -------------------------------------
 
 
 echo -- 9b. Bob knows that Aly knows that Aly peeked T in the first step
-echo -- The result should be bob_peek_H.announce_H + bob_peek_H.aly_peek_H
+echo -- The result should be aly_peek_T;announce_T + aly_peek_T.bob_peek_T.
+echo -- Aly peeks T in the first event and Bob figures it out in the second event.
 define Example9b (Two & Box(Rb,Box(Ra,Cn(World(aly%_peek%_T),Event))));
 echo -- (Two & Box(Rb,Box(Ra,Cn(World(aly_peek_T),Event))))
 regex Example9b;

@@ -78,15 +78,17 @@ query only_peek = peek*
 query three_no_announce = three & no_announce
 
 -- 17b. Worlds of length three where only peeks have happened.
+-- Note that H/T consistency is imposed.
 -- GOOD even though it should be equivalent to 17a.
 
 query three_only_peek = three & only_peek
 
 -- 17c. Worlds of length three some announcements have happened.
--- The worlds have length three, but
+-- three & have_announce
 -- GOOD apparently
 
-query three_no_announce = three & have_announce
+query three_have_announce = three & have_announce
+
 
 
 

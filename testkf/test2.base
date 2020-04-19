@@ -38,7 +38,8 @@ Com(The result should be bob_peek_H.announce_H + bob_peek_H.aly_peek_H)
 Query2(Example9a,And(Two,Boxbob(Boxaly(Con(World(bob_peek_T),Ev)))))
 
 Com(9b. Bob knows that Aly knows that Aly peeked T in the first step)
-Com(The result should be bob_peek_H.announce_H + bob_peek_H.aly_peek_H)
+Com(The result should be aly_peek_T;announce_T + aly_peek_T.bob_peek_T.)
+Com(Aly peeks T in the first event and Bob figures it out in the second event.)
 Query2(Example9b,And(Two,Boxbob(Boxaly(Con(World(aly_peek_T),Ev)))))
 
 

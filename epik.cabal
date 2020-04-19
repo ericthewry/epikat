@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 7ea7e9dd10450bf53bdf01a8e019340d8ff7cdfad5ed5c32b98816c2900efa9f
+-- hash: ab9f441946e24e080c0327fbabc1d8c531eb79d7693ac70bc49e1f8bf73c9a21
 
 name:           epik
 version:        0.1.0.0
@@ -43,6 +43,7 @@ library
     , base >=4.7 && <5
     , containers
     , mtl
+    , stack
     , universe
     , universe-base
   default-language: Haskell2010
@@ -60,6 +61,7 @@ executable epik-exe
     , containers
     , epik
     , mtl
+    , stack
     , universe
     , universe-base
   default-language: Haskell2010
@@ -78,6 +80,7 @@ test-suite epik-test
     , containers
     , epik
     , mtl
+    , stack
     , universe
     , universe-base
   default-language: Haskell2010
