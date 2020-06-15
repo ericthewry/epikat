@@ -38,6 +38,7 @@ instance Show Kat where
 
 kzero = KZ
 kepsilon = KEps
+kone = kepsilon
 kvar = KEvent
 
 kseq KEps k' = k'

@@ -182,26 +182,31 @@ allAtoms alphabet =
 inducedAtoms :: Test ->  [Atom] -> [Atom]
 inducedAtoms t = filter (\ a -> evalAtom a t)
 
--- Interprets a `Kat` expression in a given alphabet, producing its corresponding set of guarded strings
--- [| p |]^X subset of GuardedString
-gs_interp :: [Atom] -> Kat -> [GuardedString]
-gs_interp atoms KZ = []
-gs_interp atoms KEps =
-  [(Single a) | a <- atoms]
- 
-gs_interp atoms (KBool t) =
-  [(Single a) | a <- inducedAtoms t atoms]
-    
-gs_interp atoms (KEvent v) =
-  [ Prog a v (Single b)  | a <- atoms, b <- atoms ]
-
-gs_interp atoms (KSequence p q) = gs_interp atoms p `listFuse` gs_interp atoms q
-gs_interp atoms (KPlus p q) = gs_interp atoms p +++ gs_interp atoms q
-gs_interp atoms (KAnd p q) = map fst $ filter (uncurry (==)) $ gs_interp atoms p +*+ gs_interp atoms q
-gs_interp atoms (KIter p) = fixpointGS atoms $ gs_interp atoms p
-
-
 
 gsLen :: GuardedString -> Integer
 gsLen (Single _) = 0
 gsLen (Prog _ _ gs) = 1 + gsLen gs
+
+notLongerThan :: [GuardedString] -> Integer -> [GuardedString]
+notLongerThan gs n = filter (\g -> gsLen g <= n) gs
+
+
+-- Interprets a `Kat` expression in a given alphabet, producing its corresponding set of guarded strings
+-- [| p |]^X subset of GuardedString
+gs_interp :: Integer -> [Atom] -> Kat -> [GuardedString]
+gs_interp _ atoms KZ = []
+gs_interp _ atoms KEps =  [(Single a) | a <- atoms]
+ 
+gs_interp _ atoms (KBool t) =  [(Single a) | a <- inducedAtoms t atoms]
+    
+gs_interp n atoms (KEvent v) | n > 0     = [Prog a v (Single b)  | a <- atoms, b <- atoms ]
+                             | otherwise = []
+
+gs_interp n atoms (KSequence p q) = (gs_interp n atoms p `listFuse` gs_interp n atoms q) `notLongerThan` n
+gs_interp n atoms (KPlus p q) = gs_interp n atoms p +++ gs_interp n atoms q
+gs_interp n atoms (KAnd p q) = map fst $ filter (uncurry (==)) $ gs_interp n atoms p +*+ gs_interp n atoms q
+gs_interp n atoms (KIter p) =
+  let inner = gs_interp n atoms p in
+  let maxSize = foldr (\g acc -> max (gsLen g) acc) 0 inner in
+  let minSize = foldr (\g acc -> if gsLen g == 0 then acc else max (gsLen g) acc) maxSize inner in
+  gs_interp n atoms kone +++ ((inner `listFuse` gs_interp (n - minSize) atoms (kstar p)) `notLongerThan` n)

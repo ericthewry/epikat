@@ -96,7 +96,7 @@ atomicActions ctx = foldr (\x -> Set.insert (name x)) Set.empty (actionsc ctx)
 runQueries :: Declarations -> [(QueryName, String, [GuardedString])]
 runQueries decls =
   let context = compileDecls decls in
-  map (\(n, c, q) -> (n, c, gs_interpQ context q)) $
+  map (\(n, c, q) -> (n, c, gs_interpQ 5 context q)) $
 --  map (\(n, c, q) -> (n, c,computeGuardedStrings context (scopeFor (queries decls) n) q)) $
   queries decls
 
@@ -179,7 +179,7 @@ liftGS ctx alt gs'@(Prog atom p gs) =
       let katOfProg s = s `lookupAction` actionsc ctx in
       let altA = mapMaybe katOfProg alts in
       let altQ = map (queryOfKat . program) altA in        
-      let altGS = concatMap (gs_interpQ ctx) altQ in
+      let altGS = concatMap (gs_interpQ 10 ctx) altQ in
       -- error ((show [Single atom]) ++ " <> " ++ (show p) ++ " <> " ++ show (liftGS ctx alt gs) ++ " ==== " ++ show (
         if gsLen gs == 0 then altGS else 
           altGS +<>+ liftGS ctx alt gs
@@ -321,10 +321,9 @@ computeGuardedStrings :: Context -> QueryData -> Query -> [GuardedString]
 computeGuardedStrings ctx scope query =
 --  let (unionKat, andKats) = desugar ctx scope query in
   let kats = desugar ctx scope query in
-  let denote = gs_interp $ atomsc ctx in
+  let denote = gs_interp 10 $ atomsc ctx in
   -- denote unionKat ++ 
-  (intersectLazy' $
-   map (denote . (unroll 6)) kats)
+    intersectLazy' $  map denote kats
 
 
 injectProg :: AtomicProgram -> (Atom, Atom) -> Kat
@@ -351,35 +350,40 @@ substActions actions (KAnd k k') =
 substActions actions (KIter k) =
   kstar $ substActions actions k
 
-gs_interpQ :: Context -> Query -> [GuardedString]
-gs_interpQ ctx QEmpty = []
-gs_interpQ ctx QEpsilon = [(Single a) | a <- atomsc ctx]
-gs_interpQ ctx QAll = concatMap ((gs_interpQ ctx) . queryOfKat . program) $ actionsc ctx
-gs_interpQ ctx (QTest t) =
+gs_interpQ :: Integer -> Context -> Query -> [GuardedString]
+gs_interpQ _ ctx QEmpty = []
+gs_interpQ _ ctx QEpsilon = [(Single a) | a <- atomsc ctx]
+gs_interpQ n ctx QAll | n > 0     = concatMap ((gs_interpQ n ctx) . queryOfKat . program) $ actionsc ctx
+                      | otherwise = []
+gs_interpQ _ ctx (QTest t) =
   [(Single a) | a <- atomsc ctx, eval (atomToWorld a) t]
-gs_interpQ ctx (QIdent s) =
+gs_interpQ n ctx (QIdent s) =
   case AtomicProgram s `lookupAction` actionsc ctx of
-    Just x -> gs_interp (atomsc ctx) $ program x
+    Just x -> gs_interp n (atomsc ctx) $ program x
     Nothing -> case s `lookupQ` queriesc ctx of
-                 Just q -> gs_interpQ ctx q
+                 Just q -> gs_interpQ n ctx q
                  Nothing -> error ("USEBEFOREDEF " ++ s)
 
-gs_interpQ ctx q'@(QApply (QIdent s) q) =
+gs_interpQ n ctx q'@(QApply (QIdent s) q) =
   case s `lookup` viewsc ctx of
-    Just f -> liftGSPre ctx f `concatMap` gs_interpQ ctx q
+    Just f -> liftGSPre ctx f `concatMap` gs_interpQ n ctx q
       -- error ( s ++ "(" ++ (show q) ++ ") == "
       --        ++ show (take 20 $ liftGS ctx f `concatMap` gs_interpQ ctx q))
     Nothing -> error ("LHS of apply must be agent, could not find agent called" ++ s)
 
-gs_interpQ ctx (QApply _ _ ) = error ("LHS of apply must be agent, not query")
+gs_interpQ n ctx (QApply _ _ ) = error ("LHS of apply must be agent, not query")
 
-gs_interpQ ctx (QConcat q q') = gs_interpQ ctx q `listFuse` gs_interpQ ctx q'
-gs_interpQ ctx (QUnion q q') = gs_interpQ ctx q +++ gs_interpQ ctx q'
-gs_interpQ ctx (QIntersect q q') =
-  interPairList (gs_interpQ ctx q +*+ gs_interpQ ctx q')
-gs_interpQ ctx (QComplement q) =
-  gs_interpQ ctx (QAll `QConcat` QStar QAll) +-+ gs_interpQ ctx q
-gs_interpQ ctx (QStar q) = fixpointGS (atomsc ctx) $ gs_interpQ ctx q
+gs_interpQ n ctx (QConcat q q') = (gs_interpQ n ctx q `listFuse` gs_interpQ n ctx q') `notLongerThan` n
+gs_interpQ n ctx (QUnion q q') = gs_interpQ n ctx q +++ gs_interpQ n ctx q'
+gs_interpQ n ctx (QIntersect q q') =
+  interPairList (gs_interpQ n ctx q +*+ gs_interpQ n ctx q')
+gs_interpQ n ctx (QComplement q) =
+  gs_interpQ n ctx (QAll `QConcat` QStar QAll) +-+ gs_interpQ n ctx q
+gs_interpQ n ctx (QStar q) =
+  let inner = gs_interpQ n ctx q in
+  let maxSize = foldr (\g acc -> max (gsLen g) acc) 0 inner in
+  let minSize = foldr (\g acc -> if gsLen g == 0 then acc else min (gsLen g) acc) maxSize inner in
+  gs_interpQ n ctx QEpsilon +++ ((listFuse inner $ gs_interpQ (n-minSize) ctx $ QStar q) `notLongerThan` n)
 
 interPairList :: Eq a => [(a,a)] -> [a]
 interPairList [] = []
