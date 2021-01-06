@@ -40,12 +40,13 @@ data Context =
           , actionsc :: [Action]
           , viewsc :: [(Agent, Map AtomicProgram [AtomicProgram])]
           , queriesc :: QueryData}
+  deriving (Show,Eq)
 
 
-instance Show Context where
-  show ctx = "Context { alphabetc = " ++ show (alphabetc ctx)
-             ++ ", actionsc = " ++ show (actionsc ctx)
-             ++ ", viewsc = [" ++ intercalate ", " (map (\(agent, _) -> agent ++ " : <func>") (viewsc ctx)) ++ "]"
+-- instance Show Context where
+--   show ctx = "Context { alphabetc = " ++ show (alphabetc ctx)
+--              ++ ", actionsc = " ++ show (actionsc ctx)
+--              ++ ", viewsc = [" ++ intercalate ", " (map (\(agent, _) -> agent ++ " : <func>") (viewsc ctx)) ++ "]"
 
 
 
@@ -78,6 +79,10 @@ resMacroTest at mtest (TOr a b) = TOr (resMacroTest at mtest a) (resMacroTest at
 resMacroTest at mtest (TVar at') | at == at' = mtest
                                  | otherwise = TVar at'
 resMacroTest at mtest (TNeg test) = TNeg $ resMacroTest at mtest test
+
+resMacrosTest :: Macros -> Test -> Test
+resMacrosTest m t =
+  Map.foldrWithKey resMacroTest t m
 
 --- [resMacroKat a t k] applies resMacroTest to all the tests in kat
 resMacroKat :: AtomicTest -> Test -> Kat -> Kat
@@ -132,15 +137,18 @@ resolveMacros macs ctx = Map.foldrWithKey (resolveMacro) ctx macs
 
 compileDecls :: Declarations -> Context
 compileDecls prog =
-  let assert = foldr TAnd TTrue $ assertions prog in
-  resolveMacros (macros prog) $
-    Context { alphabetc = alphabet prog,
-              atomsc = inducedAtoms assert $ allAtoms $ alphabet prog,
-              assertion = assert,
-              actionsc = map (\(n, p) -> compileAction n p) $ actions prog,
-              viewsc = views prog,
-              queriesc = queries prog
-            }
+  let assert = resMacrosTest (macros prog) $
+               foldr TAnd TTrue $ assertions prog
+  in
+  let ctx = Context { alphabetc = alphabet prog,
+                      atomsc = inducedAtoms assert $ allAtoms $ alphabet prog,
+                      assertion = assert,
+                      actionsc = map (\(n, p) -> compileAction n p) $ actions prog,
+                      viewsc = views prog,
+                      queriesc = queries prog
+                    } in
+  resolveMacros (macros prog) ctx
+
 
 scopeFor :: QueryData -> QueryName -> QueryData
 scopeFor qs nm = takeWhile (\(n, _, _) -> n /= nm) qs
@@ -203,10 +211,10 @@ showKatTerms decls =
 ----------------------------------------------------------------------------------
 
 lift :: Map AtomicProgram [AtomicProgram] -> Kat -> Kat
-lift _ KZ = kzero
+lift _ KZ = kzero             
 lift _ KEps = kepsilon
 lift _ (KBool t) = ktest t
-lift _ (KEvent a) = case a `Map.lookup` alt of
+lift alt (KEvent a) = case a `Map.lookup` alt of
   Nothing -> kvar a
   Just as -> foldr (kunion . kvar ) kzero as
 lift alt (KSequence k k') = lift alt k `kseq` lift alt k'
