@@ -70,6 +70,7 @@ subst obs rplc (KAnd k k') =
 subst obs rplc (KIter k) =
   kstar $ subst obs rplc k
 
+
 --- [resMacroTest at mtest t] substitute occurences of [at] with [mtest] in [test]
 resMacroTest :: AtomicTest -> Test -> Test -> Test
 resMacroTest at mtest TTrue = TTrue
@@ -83,6 +84,23 @@ resMacroTest at mtest (TNeg test) = TNeg $ resMacroTest at mtest test
 resMacrosTest :: Macros -> Test -> Test
 resMacrosTest m t =
   Map.foldrWithKey resMacroTest t m
+
+
+resMacroMacros :: AtomicTest -> Test -> Macros -> Macros
+resMacroMacros at t = Map.map (resMacroTest at t)
+
+resMacrosMacros :: Macros -> Macros
+resMacrosMacros m = Map.foldrWithKey resMacroMacros m m
+
+--- [resMacroFix macros] produces a list of macros with all references unfolded
+--- No facility for checking loops, will diverge if loops are present
+resMacroFix :: Macros -> Macros
+resMacroFix m =
+  let m' = resMacrosMacros m in
+  if m == m' then
+    m'
+  else
+    resMacroFix m'
 
 --- [resMacroKat a t k] applies resMacroTest to all the tests in kat
 resMacroKat :: AtomicTest -> Test -> Kat -> Kat
@@ -137,7 +155,9 @@ resolveMacros macs ctx = Map.foldrWithKey (resolveMacro) ctx macs
 
 compileDecls :: Declarations -> Context
 compileDecls prog =
-  let assert = resMacrosTest (macros prog) $
+  let fixedMacros = resMacroFix $ macros prog in
+  -- error ((show fixedMacros ) ++ "\n" ++ "\n" ++ (show $ macros prog))
+  let assert = resMacrosTest fixedMacros $
                foldr TAnd TTrue $ assertions prog
   in
   let ctx = Context { alphabetc = alphabet prog,
@@ -147,7 +167,7 @@ compileDecls prog =
                       viewsc = views prog,
                       queriesc = queries prog
                     } in
-  resolveMacros (macros prog) ctx
+  resolveMacros fixedMacros ctx
 
 
 scopeFor :: QueryData -> QueryName -> QueryData
