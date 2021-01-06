@@ -33,6 +33,7 @@ import Control.Monad.Except
    agent   { TAgent }
    world   { TWorld }
    query   { TQuery }
+   macro   { TMacro }
    test    { TTest }
    IDENT   { TId $$ }
    COMMENT { TComment $$ }
@@ -64,11 +65,12 @@ Declarations : Declaration                { $1 }
              | Declaration Declarations   { combineDecls $1 $2 }
 
 -- Programs form a semigroup
-Declaration : Alphabet                    { Program $1        [] [] [] [] }
-            | Assertion                   { Program Set.empty $1 [] [] [] }
-            | Action                      { Program Set.empty [] $1 [] [] }
-            | View                        { Program Set.empty [] [] $1 [] }
-            | Query                       { Program Set.empty [] [] [] [$1] }
+Declaration : Alphabet                    { Program $1        [] [] [] []   Map.empty}
+            | Assertion                   { Program Set.empty $1 [] [] []   Map.empty}
+            | Action                      { Program Set.empty [] $1 [] []   Map.empty}
+            | View                        { Program Set.empty [] [] $1 []   Map.empty}
+            | Query                       { Program Set.empty [] [] [] [$1] Map.empty}
+            | Macro                       { Program Set.empty [] [] [] []   $1}
             | '{' Declaration '}'         { $2 }
 
 
@@ -136,6 +138,11 @@ QueryKat : '0'                          { QEmpty }
          | QueryKat '*'                 { QStar $1 }
          | test Test                    { QTest $2 }
          | '(' QueryKat ')'             { $2 }
+
+
+-- Test Macros
+Macro : macro IDENT '=' Test            {Map.singleton (AtomicTest $2) $4}
+
 
 {
 happyError = undefined

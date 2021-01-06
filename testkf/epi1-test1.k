@@ -1,6 +1,10 @@
 state = H + T
 
-restrict (~(H&T))&(H+T)
+macro either = H+T
+macro notboth = ~(H&T)
+macro w = either&notboth
+
+restrict w
 
 event announce_H = test H;id;test H
 event announce_T = test T;id;test T

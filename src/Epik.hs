@@ -40,12 +40,13 @@ data Context =
           , actionsc :: [Action]
           , viewsc :: [(Agent, Map AtomicProgram [AtomicProgram])]
           , queriesc :: QueryData}
+  deriving (Show,Eq)
 
 
-instance Show Context where
-  show ctx = "Context { alphabetc = " ++ show (alphabetc ctx)
-             ++ ", actionsc = " ++ show (actionsc ctx)
-             ++ ", viewsc = [" ++ intercalate ", " (map (\(agent, _) -> agent ++ " : <func>") (viewsc ctx)) ++ "]"
+-- instance Show Context where
+--   show ctx = "Context { alphabetc = " ++ show (alphabetc ctx)
+--              ++ ", actionsc = " ++ show (actionsc ctx)
+--              ++ ", viewsc = [" ++ intercalate ", " (map (\(agent, _) -> agent ++ " : <func>") (viewsc ctx)) ++ "]"
 
 
 
@@ -70,22 +71,107 @@ subst obs rplc (KIter k) =
   kstar $ subst obs rplc k
 
 
+--- [resMacroTest at mtest t] substitute occurences of [at] with [mtest] in [test]
+resMacroTest :: AtomicTest -> Test -> Test -> Test
+resMacroTest at mtest TTrue = TTrue
+resMacroTest at mtest TFalse = TFalse
+resMacroTest at mtest (TAnd a b) = TAnd (resMacroTest at mtest a) (resMacroTest at mtest b)
+resMacroTest at mtest (TOr a b) = TOr (resMacroTest at mtest a) (resMacroTest at mtest b)
+resMacroTest at mtest (TVar at') | at == at' = mtest
+                                 | otherwise = TVar at'
+resMacroTest at mtest (TNeg test) = TNeg $ resMacroTest at mtest test
+
+resMacrosTest :: Macros -> Test -> Test
+resMacrosTest m t =
+  Map.foldrWithKey resMacroTest t m
+
+
+resMacroMacros :: AtomicTest -> Test -> Macros -> Macros
+resMacroMacros at t = Map.map (resMacroTest at t)
+
+resMacrosMacros :: Macros -> Macros
+resMacrosMacros m = Map.foldrWithKey resMacroMacros m m
+
+--- [resMacroFix macros] produces a list of macros with all references unfolded
+--- No facility for checking loops, will diverge if loops are present
+resMacroFix :: Macros -> Macros
+resMacroFix m =
+  let m' = resMacrosMacros m in
+  if m == m' then
+    m'
+  else
+    resMacroFix m'
+
+--- [resMacroKat a t k] applies resMacroTest to all the tests in kat
+resMacroKat :: AtomicTest -> Test -> Kat -> Kat
+resMacroKat _ _ KZ = kzero
+resMacroKat _ _ KEps = kepsilon
+resMacroKat _ _ (KEvent e) = kvar e
+resMacroKat at t (KBool kt) = ktest $ resMacroTest at t kt
+resMacroKat at t (KSequence k k') = kseq (resMacroKat at t k) (resMacroKat at t k')
+resMacroKat at t (KPlus k k') = kunion (resMacroKat at t k) (resMacroKat at t k')
+resMacroKat at t (KAnd k k') = kand (resMacroKat at t k) (resMacroKat at t k')
+resMacroKat at t (KIter k) = kstar $ resMacroKat at t k
+
+--- [resMacroAction a t actions] applies resMacroTest to tests in each action in actions
+resMacroAction :: AtomicTest -> Test -> Action -> Action
+resMacroAction at mtest (Action name prog) =
+  Action {name = name, program = resMacroKat at mtest prog}
+
+resMacroActions :: AtomicTest -> Test -> [Action] -> [Action]
+resMacroActions at mtest acts = map (resMacroAction at mtest) acts
+
+resMacroQuery :: AtomicTest -> Test -> Query -> Query
+resMacroQuery _ _ QEmpty = QEmpty
+resMacroQuery _ _ QEpsilon = QEpsilon
+resMacroQuery _ _ QAll = QAll
+resMacroQuery _ _ (QIdent s) = QIdent s
+resMacroQuery at t (QTest qt) = QTest $ resMacroTest at t qt
+resMacroQuery at t (QApply q q') = QApply (resMacroQuery at t q) (resMacroQuery at t q')
+resMacroQuery at t (QConcat q q') = QConcat (resMacroQuery at t q) (resMacroQuery at t q')
+resMacroQuery at t (QUnion q q') = QUnion (resMacroQuery at t q) (resMacroQuery at t q')
+resMacroQuery at t (QIntersect q q') = QIntersect (resMacroQuery at t q) (resMacroQuery at t q')
+resMacroQuery at t (QComplement q) = QComplement $ resMacroQuery at t q
+resMacroQuery at t (QStar q) = QStar $ resMacroQuery at t q
+
+
+resMacroNamedQuery :: AtomicTest -> Test -> NamedQuery -> NamedQuery
+resMacroNamedQuery at t (nm, comm, q) = (nm, comm, resMacroQuery at t q)
+
+resMacroQueryData :: AtomicTest -> Test -> QueryData -> QueryData
+resMacroQueryData at t qd = map (resMacroNamedQuery at t) qd
+
+
+resolveMacro :: AtomicTest -> Test -> Context -> Context
+resolveMacro a t c =
+  c {assertion = resMacroTest a t $ assertion c,
+     actionsc = resMacroActions a t $ actionsc c,
+     queriesc = resMacroQueryData a t $ queriesc c
+    }
+
+
+resolveMacros :: Macros -> Context -> Context
+resolveMacros macs ctx = Map.foldrWithKey (resolveMacro) ctx macs
 
 compileDecls :: Declarations -> Context
-compileDecls (Program alphabet asserts actions views queries) =
-  let assertion = foldr TAnd TTrue asserts in
-  let atoms = inducedAtoms assertion $ allAtoms alphabet in
-  Context { alphabetc = alphabet
-          , atomsc = atoms
-          , assertion = assertion
-          , actionsc = map (\(n, p) -> compileAction n p) actions
-          , viewsc = views
-          , queriesc = queries
-          
-          }
+compileDecls prog =
+  let fixedMacros = resMacroFix $ macros prog in
+  -- error ((show fixedMacros ) ++ "\n" ++ "\n" ++ (show $ macros prog))
+  let assert = resMacrosTest fixedMacros $
+               foldr TAnd TTrue $ assertions prog
+  in
+  let ctx = Context { alphabetc = alphabet prog,
+                      atomsc = inducedAtoms assert $ allAtoms $ alphabet prog,
+                      assertion = assert,
+                      actionsc = map (\(n, p) -> compileAction n p) $ actions prog,
+                      viewsc = views prog,
+                      queriesc = queries prog
+                    } in
+  resolveMacros fixedMacros ctx
+
 
 scopeFor :: QueryData -> QueryName -> QueryData
-scopeFor qs name = takeWhile (\(n, _, _) -> n /= name) qs
+scopeFor qs nm = takeWhile (\(n, _, _) -> n /= nm) qs
 
 atomicActions :: Context -> Set AtomicProgram
 atomicActions ctx = foldr (\x -> Set.insert (name x)) Set.empty (actionsc ctx)
@@ -145,13 +231,14 @@ showKatTerms decls =
 ----------------------------------------------------------------------------------
 
 lift :: Map AtomicProgram [AtomicProgram] -> Kat -> Kat
-lift alt KZ = kzero             
-lift alt KEps = kepsilon
-lift alt (KBool t) = ktest t
+lift _ KZ = kzero             
+lift _ KEps = kepsilon
+lift _ (KBool t) = ktest t
 lift alt (KEvent a) = case a `Map.lookup` alt of
   Nothing -> kvar a
   Just as -> foldr (kunion . kvar ) kzero as
 lift alt (KSequence k k') = lift alt k `kseq` lift alt k'
+lift alt (KAnd k k') = lift alt k `kand` lift alt k'
 lift alt (KPlus k k') = lift alt k `kunion` lift alt k'
 lift alt (KIter k) = kstar $ lift alt k
 
