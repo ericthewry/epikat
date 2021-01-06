@@ -22,10 +22,10 @@ tokens :-
   $white +         ;
   "#".*            ;
   "--".*           { \s -> TComment s }
-  assert           { \s -> TAssert }
-  action           { \s -> TAction }
+  restrict         { \s -> TAssert }
+  event            { \s -> TAction }
   agent            { \s -> TAgent }
-  world            { \s -> TWorld }
+  state            { \s -> TWorld }
   query            { \s -> TQuery }
   test             { \s -> TTest }
   [=]              { \s -> TEq }

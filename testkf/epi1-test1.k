@@ -1,15 +1,15 @@
-world = H + T
+state = H + T
 
-assert (~(H&T))&(H+T)
+restrict (~(H&T))&(H+T)
 
-action announce_H = test H;id;test H
-action announce_T = test T;id;test T
+event announce_H = test H;id;test H
+event announce_T = test T;id;test T
 
-action aly_peek_H  = test H;id;test H
-action aly_peek_T  = test T;id;test T
+event aly_peek_H  = test H;id;test H
+event aly_peek_T  = test T;id;test T
 
-action bob_peek_H  = test H;id;test H
-action bob_peek_T  = test T;id;test T
+event bob_peek_H  = test H;id;test H
+event bob_peek_T  = test T;id;test T
 
 agent aly =
   (announce_H -> announce_H)
