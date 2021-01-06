@@ -1,15 +1,15 @@
-world = H + T
+state = H + T
 
-assert (~(H&T))&(H+T)
+restrict (~(H&T))&(H+T)
 
-action c1 = test H;id;test H
-action c0 = test T;id;test T
+event c1 = test H;id;test H
+event c0 = test T;id;test T
 
-action a1  = test H;id;test H
-action a0  = test T;id;test T
+event a1  = test H;id;test H
+event a0  = test T;id;test T
 
-action b1  = test H;id;test H
-action b0  = test T;id;test T
+event b1  = test H;id;test H
+event b0  = test T;id;test T
 
 agent aly =
   (c1 -> c1)
