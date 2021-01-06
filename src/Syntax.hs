@@ -124,6 +124,7 @@ type Agent = String
 type QueryName = String
 type NamedQuery = (QueryName, String, Query)
 type QueryData = [NamedQuery]
+type Macros = Map AtomicTest Test
 
 
 data Declarations =
@@ -132,13 +133,15 @@ data Declarations =
           , actions :: [(AtomicProgram, Kat)] -- the world actions and their relations
           , views :: [(Agent, Map AtomicProgram [AtomicProgram])] -- alternative relations
           , queries :: QueryData -- queries expressed in KAT
+          , macros :: Macros
           } deriving (Eq,Show)
 
-
+combineDecls :: Declarations -> Declarations -> Declarations
 combineDecls decl decl' =
   let join j f = f decl `j` f decl' in
-  Program { alphabet= join (Set.union) alphabet
+  Program { alphabet= join Set.union alphabet
           , assertions = join (++) assertions
           , actions = join (++) actions
           , views = join  (++) views
-          , queries = join (++) queries }
+          , queries = join (++) queries
+          , macros = join Map.union macros}

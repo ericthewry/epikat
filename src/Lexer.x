@@ -27,6 +27,7 @@ tokens :-
   agent            { \s -> TAgent }
   state            { \s -> TWorld }
   query            { \s -> TQuery }
+  macro            { \s -> TMacro }
   test             { \s -> TTest }
   [=]              { \s -> TEq }
   \-\>             { \s -> TArrow }
@@ -64,6 +65,7 @@ data Token =
      | TRBracket
      | TArrow
      | TQuery
+     | TMacro
      | TAssert
      | TEq
      | TWorld
