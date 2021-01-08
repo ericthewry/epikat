@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: ab9f441946e24e080c0327fbabc1d8c531eb79d7693ac70bc49e1f8bf73c9a21
+-- hash: 9d43891a2a48c4e33912adc3144726c293a98aa91c858f6f61bef59aee901769
 
 name:           epik
 version:        0.1.0.0
@@ -30,6 +30,7 @@ library
       AutoDeriv
       BDD
       Epik
+      FstGen
       GuardedStrings
       Lexer
       Parser
