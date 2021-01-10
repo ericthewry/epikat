@@ -110,7 +110,7 @@ b0 = (tests ["h","t"])
 -- Fst string with the form of a pair of non-matching atoms.
 -- unequalStPair b0 ~> "define UnequalStPair [h [St - h]] | [[St - h] h] | [t [St - t]] | [[St - t] t];"
 unequalStPair :: (Set AtomicTest) -> String
-unequalStPair xs = "define UnequalStPair " ++ (disjoin (map unequalStPair0 (Set.toList b0))) ++ ";"
+unequalStPair xs = "define UnequalStPair " ++ (disjoin (map unequalStPair0 (Set.toList xs))) ++ ";"
   where disjoin [x] = x
         disjoin (x : xs) = x ++ " | " ++ (disjoin xs)
 
