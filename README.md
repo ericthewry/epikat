@@ -81,7 +81,7 @@ event amy_turns_heads (test heads):(test tails)
 event amy_turns_tails (test tails):(test heads)
 ```
 
-And similarly for `Bob``:
+And similarly for `Bob`:
 ``` 
 event amy_turns_heads (test heads):(test tails)
 event amy_turns_tails (test tails):(test heads)
