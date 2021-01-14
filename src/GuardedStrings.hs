@@ -21,7 +21,9 @@ data Atom =
 instance Show Atom where
   show (Atom pos neg) =
     let join a rst = (if Set.member a neg then "~" else "") ++ show a ++ "" ++ rst in 
-    "(" ++ Set.fold join "" (Set.union pos neg) ++ ")"
+    -- "(" ++ Set.fold join "" (Set.union pos neg) ++ ")"
+    "(" ++ Set.fold join "" pos ++ ")"
+
     -- Set.fold  "" pos ++
     -- Set.fold (\a -> (++) ("~" ++ show a ++ "")) "" neg ++ ")"
 
@@ -46,10 +48,10 @@ data GuardedString =
   deriving (Eq,Ord)
 
 instance Show GuardedString where
-  show (Single atom) = "" -- show atom
+  show (Single atom) =  show atom
   show (Prog atom prog gs) =
-    -- show atom ++ "." ++ show prog ++ "." ++ show gs
-    show prog ++ "." ++ show gs
+    show atom ++ "." ++ show prog ++ "." ++ show gs
+    -- show prog ++ "." ++ show gs
 
 -- get the first atom of a guarded string
 first :: GuardedString -> Atom

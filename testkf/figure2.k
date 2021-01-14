@@ -30,7 +30,7 @@ agent amy
 agent bob
   (o -> o)
   (a1 -> a1 + a0)
-  (a0 -> a0 + a0)
+  (a0 -> a1 + a0)
   (b1 -> b1)
   (b0 -> b0)
   (a10 -> o)

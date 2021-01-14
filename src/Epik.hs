@@ -164,6 +164,7 @@ compileDecls prog =
                       viewsc = views prog,
                       queriesc = queries prog
                     } in
+  -- error (show $ viewsc ctx)
   resolveMacros fixedMacros ctx
 
 
@@ -241,7 +242,7 @@ lift _ KZ = kzero
 lift _ KEps = kepsilon
 lift _ (KBool t) = ktest t
 lift alt (KEvent a) = case a `Map.lookup` alt of
-  Nothing -> kvar a
+  Nothing -> kzero
   Just as -> foldr (kunion . kvar) kzero as
 lift alt (KSequence k k') = lift alt k `kseq` lift alt k'
 lift alt (KAnd k k') = lift alt k `kand` lift alt k'
@@ -254,7 +255,7 @@ liftQ alt QAll = QAll
 liftQ alt QEpsilon = QEpsilon
 liftQ alt (QTest t) = QTest t
 liftQ alt (QIdent a) = case (AtomicProgram a) `Map.lookup` alt of
-  Nothing -> QIdent a
+  Nothing -> QEmpty
   Just as -> foldr (QUnion . QIdent . show ) QEmpty as
 liftQ alt q@(QApply _ _) = error ("nested QApply could not be resolved for expr " ++ show q)
 liftQ alt (QConcat q q') = liftQ alt q `QConcat` liftQ alt q'
@@ -267,7 +268,7 @@ liftGS :: Context -> Map AtomicProgram [AtomicProgram] -> GuardedString -> [Guar
 liftGS ctx alt (Single atom) = [Single atom]
 liftGS ctx alt gs'@(Prog atom p gs) =
   case (p `Map.lookup` alt) of
-    Nothing -> [gs']
+    Nothing -> []
     Just alts ->
       let act s = s `lookupAction` actionsc ctx in
       let altA = mapMaybe act alts in
@@ -335,7 +336,7 @@ gs_interpQ n ctx (QUnion q q') = gs_interpQ n ctx q +++ gs_interpQ n ctx q'
 gs_interpQ n ctx (QIntersect q q') =
   interPairList (gs_interpQ n ctx q +*+ gs_interpQ n ctx q')
 gs_interpQ n ctx (QComplement q) =
-  gs_interpQ n ctx (QAll `QConcat` QStar QAll) +-+ gs_interpQ n ctx q
+  gs_interpQ n ctx (QConcat QAll $ QStar QAll) +-+ gs_interpQ n ctx q
 gs_interpQ n ctx (QStar q) =
   let inner = gs_interpQ n ctx q in
   let maxSize = foldr (\g acc -> max (gsLen g) acc) 0 inner in
