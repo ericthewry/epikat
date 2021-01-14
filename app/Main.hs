@@ -22,9 +22,7 @@ data Mode = Kat | GS | Auto | Fst deriving (Eq,Show,Ord)
 
 parseArgs :: [String] -> (String, Mode, Int)
 parseArgs [] = error "insufficient arguments!"
-parseArgs ("kat":f:_)  = (f, Kat, (-1))
 parseArgs ("gs":n:f:_) = (f, GS, read n)
-parseArgs ("auto":n:f:_) = (f, Auto, read n)
 parseArgs ("fst":f:_) = (f, Fst, (-1))
 parseArgs (n:f:_) = (f, GS, read n) -- If no command given, default to GS model
 parseArgs args = error ("Unrecognized arguments " ++ intercalate " " args)
@@ -37,7 +35,7 @@ main = do
   args <- getArgs
   let (file, mode, num) = parseArgs args
   case mode of
-    Kat  -> process file showKatTerms
+    Kat  -> error "kat printing is disabled"
     GS   -> process file $ showQueryResults num False
     Auto -> error "No automaton model is available yet"
     Fst  -> process file gen_fst

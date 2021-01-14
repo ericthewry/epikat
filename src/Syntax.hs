@@ -127,10 +127,27 @@ type QueryData = [NamedQuery]
 type Macros = Map AtomicTest Test
 
 
+-- Effect formulas as in Figure 1.
+data Effect =
+  EPair Test Test
+  | EOr Effect Effect
+  | EAnd Effect Effect
+  | ENeg Effect
+  deriving (Eq,Ord)
+
+-- This is not used in generating Fst.
+instance Show Effect where
+  show (EPair u v) = show u ++ " : " ++ show v
+  show (EOr u v) = show u ++ " + " ++ show v
+  show (EAnd u v) = show u ++ " & " ++ show v
+  show (ENeg x) = "~" ++ show x
+
+
+
 data Declarations =
   Program { alphabet :: Set AtomicTest        -- the alphabet of world-states
           , assertions :: [Test] -- conditions that specify consistent worlds
-          , actions :: [(AtomicProgram, Kat)] -- the world actions and their relations
+          , actions :: [(AtomicProgram, Effect)] -- the world actions and their relations
           , views :: [(Agent, Map AtomicProgram [AtomicProgram])] -- alternative relations
           , queries :: QueryData -- queries expressed in KAT
           , macros :: Macros

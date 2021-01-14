@@ -44,6 +44,7 @@ tokens :-
   [\~]             { \s -> TTilde }
   [\&]             { \s -> TAmper }
   [\_]             { \s -> TUnderscore }
+  [\:]             { \s -> TPair }
 
 {
 
@@ -71,6 +72,7 @@ data Token =
      | TWorld
      | TAction
      | TAgent
+     | TPair
      deriving(Eq, Show)
 
 scanTokens :: String -> Except String [Token]

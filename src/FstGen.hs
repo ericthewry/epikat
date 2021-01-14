@@ -13,21 +13,6 @@ import Syntax
 import Epik
 import GuardedStrings
 
--- Effect formulas as in Figure 1.
-data Effect =
-  EPair Test Test
-  | EOr Effect Effect
-  | EAnd Effect Effect
-  | ENeg Effect
-  deriving (Eq,Ord)
-
--- This is not used in generating Fst.
-instance Show Effect where
-  show (EPair u v) = show u ++ " : " ++ show v
-  show (EOr u v) = show u ++ " + " ++ show v
-  show (EAnd u v) = show u ++ " & " ++ show v
-  show (ENeg x) = "~" ++ show x
-
 -- combineDecls decl decl' =
 --  let join j f = f decl `j` f decl' in
 --  Program { alphabet= join (Set.union) alphabet
@@ -188,26 +173,10 @@ agentDef xs = ["source kat.fst;"] ++ (map agentDef0 xs)
 agentDef0 :: (Agent, [(AtomicProgram, [AtomicProgram])]) -> String
 agentDef0 (a,xs) = "define " ++ a ++ " RelKst(" ++ (eventRel1 xs) ++ ");"
 
-
--- I'm not sure this is doing the right thing In math we're aggregating
--- \/ (fst gs, last gs)
--- for every guarded string denoted by k The code above might be
--- making a different assumption about the structure of EAbstr but idk.
-effectOfProgram :: Context -> Kat -> Effect
-effectOfProgram ctx k =
-  let strings = gs_interp 100 (atomsc ctx) k in
-  foldr effectOfGSAcc (EPair TFalse TFalse) strings
-  where effectOfGSAcc :: GuardedString -> Effect -> Effect
-        effectOfGSAcc gs acc =
-          EOr acc $
-          EPair (testOfAtom $ first gs)
-                (testOfAtom $ GuardedStrings.last gs)
-
-
 events :: Context -> [(AtomicProgram, Effect)]
 events ctx =
   let acts = actionsc ctx in
-  map (\ a -> (name a, effectOfProgram ctx $ program a)) acts
+  map (\ a -> (name a, program a)) acts
 
 agents :: Context -> [(Agent, [(AtomicProgram, [AtomicProgram])])]
 agents ctx =

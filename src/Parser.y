@@ -46,6 +46,7 @@ import Control.Monad.Except
    '1'     { TOne  }
    '+'     { TUnion }
    ';'     { TSeq }
+   ':'     { TPair }
    '~'     { TTilde }
    '_'     { TUnderscore }
    '*'     { TStar }
@@ -75,10 +76,10 @@ Declaration : Alphabet                    { Program $1        [] [] [] []   Map.
 
 
 -- Alphabet
-Alphabet :  world '=' Worlds            { Set.fromList $3 }
+Alphabet :  world Worlds                { Set.fromList $2 }
  
 Worlds : IDENT                          { [AtomicTest $1]  }
-       | IDENT '+' Worlds               { AtomicTest $1 : $3 }
+       | IDENT Worlds                   { AtomicTest $1 : $2 }
 
  
 -- Assertions
@@ -95,7 +96,14 @@ Test : '0'                              { TFalse }
 
 
 -- Actions
-Action : action IDENT '=' Kat           { [(AtomicProgram $2, $4)] }
+Action : action IDENT Effect           { [(AtomicProgram $2, $3)] }
+
+
+Effect : test Test ':' test Test                  { EPair $2 $5 }
+       | '(' test Test ')' ':' '(' test Test ')'  { EPair $3 $8 }
+       | Effect '+' Effect                        { EOr $1 $3 }
+       | Effect '&' Effect                        { EAnd $1 $3 }
+       | '~' Effect                               { ENeg $2 }
 
 
 Kat : '0'                               { kzero } 
@@ -109,7 +117,7 @@ Kat : '0'                               { kzero }
 
 
 -- Views / Alternative Relations
-View : agent IDENT '=' Alts             { [($2, Map.fromList $4)] } 
+View : agent IDENT Alts             { [($2, Map.fromList $3)] }
 
 Alts : '(' IDENT '->' AltList ')'       { [(AtomicProgram $2, $4)] }
      | '(' IDENT '->' AltList ')' Alts  { (AtomicProgram $2, $4) : $6 }
