@@ -192,17 +192,15 @@ accShow sep x str = sep ++ show x ++ str
 
 showQueryResults :: Int -> Bool -> Declarations -> String
 showQueryResults num useStrings decls =
-  -- let queries = if useStrings then runQueries decls else runQueriesAuto decls in
   let queries = runQueries decls in
     foldr (\(name, comments, gsTraces) accStr ->
-                let gsStr = foldr (accShow "\n\t") "\n" (sortOn gsLen$ takeUnique num gsTraces)  in
+                let gsStr = foldr (accShow "\n\t") "\n" (sortOn gsLen $ takeUnique num gsTraces)  in
                 let header = name ++ " identifies the following strings:" in
                 let footer = replicate (length header `div` 2) '+' in
                   comments ++ "\n" ++ 
                   header ++ "\n" ++
                   gsStr ++ "\n" ++ 
                   footer ++ "\n\n" ++ accStr
-             -- name ++ " produces the automaton: \n " ++ show auto ++ "----\n\n" ++ accStr
           ) "" queries
 
 
@@ -214,9 +212,7 @@ showQueryResults num useStrings decls =
 
 queryOfEffect :: AtomicProgram -> Effect -> Query
 queryOfEffect a (EPair t1 t2) =
-  QTest t1 `QConcat`
-  (QIdent $ show a) `QConcat`
-  QTest t2
+  QEvent t1 (show a) t2
 queryOfEffect a (EOr e1 e2) =
   QUnion (queryOfEffect a e1) (queryOfEffect a e2)
 queryOfEffect a (EAnd e1 e2) =
@@ -246,7 +242,7 @@ lift _ KEps = kepsilon
 lift _ (KBool t) = ktest t
 lift alt (KEvent a) = case a `Map.lookup` alt of
   Nothing -> kvar a
-  Just as -> foldr (kunion . kvar ) kzero as
+  Just as -> foldr (kunion . kvar) kzero as
 lift alt (KSequence k k') = lift alt k `kseq` lift alt k'
 lift alt (KAnd k k') = lift alt k `kand` lift alt k'
 lift alt (KPlus k k') = lift alt k `kunion` lift alt k'
@@ -322,12 +318,14 @@ gs_interpQ n ctx (QIdent s) =
     Nothing -> case s `lookupQ` queriesc ctx of
                  Just q -> gs_interpQ n ctx q
                  Nothing -> error ("USEBEFOREDEF " ++ s)
+gs_interpQ n ctx (QEvent pre s post) =
+  let preatoms = inducedAtoms pre $ atomsc ctx in
+  let postatoms = inducedAtoms post $ atomsc ctx in
+  [Prog a (AtomicProgram s) (Single b)  | a <- preatoms, b <- postatoms ]
 
 gs_interpQ n ctx q'@(QApply (QIdent s) q) =
   case s `lookup` viewsc ctx of
     Just f -> liftGSPre ctx f `concatMap` gs_interpQ n ctx q
-      -- error ( s ++ "(" ++ (show q) ++ ") == "
-      --        ++ show (take 20 $ liftGS ctx f `concatMap` gs_interpQ ctx q))
     Nothing -> error ("LHS of apply must be agent, could not find agent called" ++ s)
 
 gs_interpQ n ctx (QApply _ _ ) = error ("LHS of apply must be agent, not query")

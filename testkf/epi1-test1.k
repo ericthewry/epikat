@@ -1,4 +1,4 @@
-state = H + T
+state H T
 
 macro either = H+T
 macro notboth = ~(H&T)
@@ -6,16 +6,16 @@ macro w = either&notboth
 
 restrict w
 
-event announce_H = test H;id;test H
-event announce_T = test T;id;test T
+event announce_H  (test H):(test H)
+event announce_T  (test T):(test T)
 
-event aly_peek_H  = test H;id;test H
-event aly_peek_T  = test T;id;test T
+event aly_peek_H  (test H):(test H)
+event aly_peek_T  (test T):(test T)
 
-event bob_peek_H  = test H;id;test H
-event bob_peek_T  = test T;id;test T
+event bob_peek_H  (test H):(test H)
+event bob_peek_T  (test T):(test T)
 
-agent aly =
+agent aly
   (announce_H -> announce_H)
   (announce_T -> announce_T)
   (aly_peek_H -> aly_peek_H)
@@ -23,7 +23,7 @@ agent aly =
   (bob_peek_H -> bob_peek_H + bob_peek_T)
   (bob_peek_T -> bob_peek_H + bob_peek_T)
 
-agent bob =
+agent bob
   (announce_H -> announce_H)
   (announce_T -> announce_T)
   (aly_peek_H -> aly_peek_H + aly_peek_T)
@@ -45,7 +45,7 @@ agent bob =
 
 
 
-
+query anh = announce_H
 
 
 -- 1. Worlds where the world announce_H is a possibility for aly.

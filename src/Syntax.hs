@@ -92,7 +92,8 @@ data Query = -- a relational alegebra for Queries
   QEmpty -- Uninhabited
   | QEpsilon -- the empty string
   | QAll -- Inhabited by every one-character string
-  | QIdent String -- An Agent, View, or Previously-defined Query
+  | QIdent String -- An Agent, View, Unresolved ACtion or Previously-defined Query
+  | QEvent Test String Test -- An action that has been decorated. Should be treated like pure KAT event.
   | QTest Test  -- check a test
   | QApply Query Query -- QApply f x is f(x)
   -- | QDomain Query -- get domain of agent's view
@@ -110,6 +111,8 @@ instance Show Query  where
   show QEpsilon = "1"
   show QAll   = "_"
   show (QIdent s) = s
+  show (QEvent pre s post) = show pre ++ ";" ++ s ++ ";" ++ show post
+  show (QTest t) = show t
   show (QApply f x) = show f ++ "(" ++ show x ++ ")"
   -- show (QDomain q) = "dom(" ++ show q ++ ")"
   -- show (QCodom q) = "codom(" ++ show q ++ ")"
