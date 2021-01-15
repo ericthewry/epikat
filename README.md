@@ -1,6 +1,6 @@
-# Epik -- Epistemic <span style="font-variant:small-caps;">Kat</span>
+# EpiKAT -- Epistemic <span style="font-variant:small-caps;">Kat</span>
 
-Epik is a modelling tool for representing the intensional semantics of natural
+EpiKAT is a modelling tool for representing the intensional semantics of natural
 language sentences. Users specify valid world states, events that transition
 between states, epistemic agents, and the inferences the agents make from the
 worlds. Together these represent a space of possible worlds in which the user
@@ -10,7 +10,7 @@ our SCiL '21 paper.
 > # TODO link paper once it has a stable link.
 
 ## Tutorial : The Concealed Coin
-As a running example to showcase the features of Epik, we will re-use the
+As a running example to showcase the features of EpiKAT, we will re-use the
 concealed coin example from the paper. If there are two agents at a table `Amy`
 and `Bob` who are curious about whether a concealed coin is heads-up or tails-up
 (lets say its been flipped and covered with a sheet of paper befor either party
@@ -173,10 +173,10 @@ comes from the event alternative, which might be misleading. Really this only
 captures "true beliefs", and can only be said to be true knowledge if the
 alternative relation is in a certain form. See the paper for details.
 
-## Building and Installing Epik from Source
+## Building and Installing EpiKAT from Source
 
 Install `git` and clone this respository. Change into the toplevel directory,
-probably it will be named `epik`, unless you manually specified a different
+probably it will be named `epikat`, unless you manually specified a different
 name.
 
 ### Prerequisites
@@ -196,22 +196,22 @@ If `stack` complains about any other missing packages, install those too.
 
 To build the project, run `stack build --copy-bins`.
 
-## Running Epik
+## Running EpiKAT
 
-Now you can run `epik` as a command line tool. There are two outputs, lists of
+Now you can run `epikat` as a command line tool. There are two outputs, lists of
 guarded strings, and `fst` code.
 
 ### Computing lists of guarded strings
 
 For example, to compute the guarded strings that correspond to the above
-queries, simply run `epik gs 8 testkf/demo.k`. This may take a few moments. The
-second parameter `8` tells `epik` to compute no more than `8` guarded strings
+queries, simply run `epikat gs 8 testkf/demo.k`. This may take a few moments. The
+second parameter `8` tells `epikat` to compute no more than `8` guarded strings
 per query. If you would like to see more detail you can increase this as large
 as you would like.
 
 ### Generating fst code  
 
-To generate `fst` code, you can run `epik fst testkf/demo.k` and then run
+To generate `fst` code, you can run `epikat fst testkf/demo.k` and then run
 `xfst`, to interact with the generated model
 
 ## Other resources

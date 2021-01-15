@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: ad5cd4afc9f9a4d169c546757e2c68b28deb9aa3a5950c146c86aa48007dbca3
+-- hash: 2c7e639c180ab6aca29f880001254492855814baaf41843efd855e1806c3c1c8
 
 name:           epik
 version:        0.1.0.0
@@ -49,7 +49,7 @@ library
     , universe-base
   default-language: Haskell2010
 
-executable epik
+executable epikat
   main-is: Main.hs
   other-modules:
       Paths_epik

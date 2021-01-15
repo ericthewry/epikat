@@ -32,7 +32,7 @@ library:
   source-dirs: src
 
 executables:
-  epik:
+  epikat:
     main:                Main.hs
     source-dirs:         app
     ghc-options:
