@@ -209,7 +209,7 @@ second parameter `8` tells `epikat` to compute no more than `8` guarded strings
 per query. If you would like to see more detail you can increase this as large
 as you would like.
 
-### Generating fst code  
+### Generating fst code
 
 To generate `fst` code, you can run `epikat fst testkf/demo.k` and then run
 `xfst`, to interact with the generated model
