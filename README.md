@@ -4,10 +4,8 @@ EpiKAT is a modelling tool for representing the intensional semantics of natural
 language sentences. Users specify valid world states, events that transition
 between states, epistemic agents, and the inferences the agents make from the
 worlds. Together these represent a space of possible worlds in which the user
-can evaluate the logical forms of sentences. More information can be found in
-our SCiL '21 paper.
-
-> # TODO link paper once it has a stable link.
+can evaluate the logical forms of sentences. Technical Details can be found in
+our [SCiL '21 paper](https://scholarworks.umass.edu/scil/vol4/iss1/9/).
 
 ## Tutorial : The Concealed Coin
 As a running example to showcase the features of EpiKAT, we will re-use the
@@ -213,10 +211,6 @@ as you would like.
 
 To generate `fst` code, you can run `epikat fst testkf/demo.k` and then run
 `xfst`, to interact with the generated model
-
-## Other resources
-
-> TODO Mats
 
 # Issues
 
